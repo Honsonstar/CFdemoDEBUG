@@ -753,9 +753,15 @@ def _train_loop_survival(epoch, model, modality, loader, optimizer, scheduler, l
     # ============================================================
     if hasattr(model, 'use_debias'):
         use_debiase = model.use_debias
-        print(f"🔍 [Debug] Detected model.use_debias = {use_debiase}")
+        # 仅打印一次，避免每个epoch都刷屏
+        if not hasattr(model, '_debug_printed'):
+            print(f"🔍 [Debug] Detected model.use_debias = {use_debiase}")
+            model._debug_printed = True
     else:
-        print(f"⚠️  [Warn] Model doesn't have 'use_debias' attribute, using passed value: {use_debiase}")
+        # 仅打印一次
+        if not hasattr(model, '_debug_printed'):
+            print(f"⚠️  [Warn] Model doesn't have 'use_debias' attribute, using passed value: {use_debiase}")
+            model._debug_printed = True
 
 
     total_loss = 0.
@@ -1004,9 +1010,15 @@ def _summary(dataset_factory, model, modality, loader, loss_fn, survival_train=N
     # ============================================================
     if hasattr(model, 'use_debias'):
         use_debiase = model.use_debias
-        print(f"🔍 [Debug] Detected model.use_debias = {use_debiase}")
+        # 仅打印一次，避免每个epoch都刷屏
+        if not hasattr(model, '_debug_printed'):
+            print(f"🔍 [Debug] Detected model.use_debias = {use_debiase}")
+            model._debug_printed = True
     else:
-        print(f"⚠️  [Warn] Model doesn't have 'use_debias' attribute, using passed value: {use_debiase}")
+        # 仅打印一次
+        if not hasattr(model, '_debug_printed'):
+            print(f"⚠️  [Warn] Model doesn't have 'use_debias' attribute, using passed value: {use_debiase}")
+            model._debug_printed = True
 
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()

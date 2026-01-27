@@ -559,6 +559,9 @@ class SurvivalDatasetFactory:
             f'features/{self.study}/fold_{fold}_genes.csv'
         )
 
+        # 【实锤日志】在读取前强制打印，让用户一眼看到
+        print(f"🔍 [Data Loading] Loading gene features from: {fold_feature_file}")
+
         custom_omics_dict = None
         if os.path.exists(fold_feature_file):
             print(f"🔄 [Nested CV] Loading dynamic features for Fold {fold}: {fold_feature_file}")

@@ -1062,10 +1062,16 @@ class SNNOmics(nn.Module):
         # 【修复】根据运行模式选择正确的输入特征
         if self.ab_model == 1:  # 仅文本模式
             cat_embeddings = text_embeddings
-            print(f"[Debug] 仅文本模式: cat_embeddings shape = {cat_embeddings.shape}")
+            # 仅在第一个batch打印，避免日志刷屏
+            if not hasattr(self, '_print_debug'):
+                print(f"[Debug] 仅文本模式: cat_embeddings shape = {cat_embeddings.shape}")
+                self._print_debug = True
         elif self.ab_model == 2:  # 仅基因模式
             cat_embeddings = gene_level_rep
-            print(f"[Debug] 仅基因模式: cat_embeddings shape = {cat_embeddings.shape}")
+            # 仅在第一个batch打印，避免日志刷屏
+            if not hasattr(self, '_print_debug'):
+                print(f"[Debug] 仅基因模式: cat_embeddings shape = {cat_embeddings.shape}")
+                self._print_debug = True
         else:  # 多模态融合模式 (ab_model == 3)
             if self.use_pathway:
                 # 多模态：基因 + 交叉注意力 + 文本
@@ -1073,7 +1079,10 @@ class SNNOmics(nn.Module):
             else:
                 # 多模态：基因 + 文本
                 cat_embeddings = torch.cat([gene_level_rep, text_embeddings], dim=1)
-            print(f"[Debug] 多模态模式: cat_embeddings shape = {cat_embeddings.shape}")
+            # 仅在第一个batch打印，避免日志刷屏
+            if not hasattr(self, '_print_debug'):
+                print(f"[Debug] 多模态模式: cat_embeddings shape = {cat_embeddings.shape}")
+                self._print_debug = True
 
         # 【已改】临时禁用门控融合，恢复简单相加
         text_pred = self.text_classifier(self.text_projection(text_embeddings))
