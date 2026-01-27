@@ -1,19 +1,20 @@
 #!/bin/bash
 STUDY=$1
 FOLD=$2
-SPLIT_DIR=$3
+SPLIT_BASE=$3
 
-echo "   [Sub-Task] Running CPCG for $STUDY Fold $FOLD..."
-echo "   Split Dir: $SPLIT_DIR"
+# 构造文件路径
+SPLIT_FILE="${SPLIT_BASE}/splits_${FOLD}.csv"
 
-# 关键修正：确保参数之间有空格，且引用正确
-# 同时也打印出即将执行的命令以便调试
-CMD="python3 run_real_nested_cv.py --study ${STUDY} --fold ${FOLD} --split_dir ${SPLIT_DIR}"
-echo "   Executing: $CMD"
+echo "   [Run] Python CPCG for $STUDY Fold $FOLD"
+echo "   [Src] $SPLIT_FILE"
 
-$CMD
+# 调用 Python 脚本
+python3 run_cpog_nested_cv.py --study "$STUDY" --fold "$FOLD" --split_file "$SPLIT_FILE"
 
-if [ $? -ne 0 ]; then
-    echo "   ❌ Python script failed for Fold $FOLD"
-    exit 1
+# 捕获 Python 退出代码
+RET=$?
+if [ $RET -ne 0 ]; then
+    echo "   ❌ Fold $FOLD failed with exit code $RET"
+    exit $RET
 fi
