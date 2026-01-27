@@ -113,19 +113,11 @@ def screen_step_1(clinical_final, exp_data, h_type, threshold=100, n_jobs=-1):
     # 并行处理所有基因
     print(f"📊 正在并行处理 {len(gene_names)} 个基因...")
 
-    # 使用tqdm进度条（如果有的话）
-    if HAS_TQDM:
-        pbar = tqdm(total=len(gene_names), desc="筛选基因", unit="个")
-        results = []
-        for aa in range(len(gene_names)):
-            results.append(_process_single_gene(ed[aa:aa+1], cd, h_type, gene_names[aa]))
-            pbar.update(1)
-        pbar.close()
-    else:
-        results = Parallel(n_jobs=n_jobs)(
-            delayed(_process_single_gene)(ed[aa:aa+1], cd, h_type, gene_names[aa])
-            for aa in range(len(gene_names))
-        )
+    # 【强制并行】移除串行逻辑，无条件使用joblib.Parallel
+    results = Parallel(n_jobs=-1, verbose=5)(
+        delayed(_process_single_gene)(ed[aa:aa+1], cd, h_type, gene_names[aa])
+        for aa in range(len(gene_names))
+    )
 
     # 整理结果
     table = pd.DataFrame(index=gene_names, columns=['corr'])
