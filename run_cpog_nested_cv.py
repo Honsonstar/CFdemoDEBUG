@@ -67,28 +67,32 @@ def main():
         # 运行 CPCG (threshold=100 保证特征数量)
         selector = NestedCVFeatureSelector(args.study, data_root_dir, threshold=100)
         
-        temp_feature_file = selector.select_features_for_fold(
-            fold=args.fold,
-            train_ids=train_ids,
-            val_ids=val_ids,
-            test_ids=test_ids
-        )
-        
-        features_dir = f'features/{args.study}'
-        os.makedirs(features_dir, exist_ok=True)
-        final_file = f'{features_dir}/fold_{args.fold}_genes.csv'
-        
-        shutil.copy2(temp_feature_file, final_file)
-        print(f"\n✅ Fold {args.fold} 完成! 文件已保存至: {final_file}")
-        
-        # 验证结果
-        res_df = pd.read_csv(final_file)
-        feat_count = max(0, len(res_df.columns) - 2)
-        print(f"   最终筛选基因数: {feat_count}")
+        # 【关键修复】使用 with 语句管理生命周期 (temp_dir 创建与清理)
+        with selector:
+            temp_feature_file = selector.select_features_for_fold(
+                fold=args.fold,
+                train_ids=train_ids,
+                val_ids=val_ids,
+                test_ids=test_ids
+            )
+            
+            features_dir = f'features/{args.study}'
+            os.makedirs(features_dir, exist_ok=True)
+            final_file = f'{features_dir}/fold_{args.fold}_genes.csv'
+            
+            # 必须在 with 块内复制文件，因为退出块后临时目录会被删除
+            shutil.copy2(temp_feature_file, final_file)
+            print(f"\n✅ Fold {args.fold} 完成! 文件已保存至: {final_file}")
+            
+            # 验证结果
+            res_df = pd.read_csv(final_file)
+            feat_count = max(0, len(res_df.columns) - 2)
+            print(f"   最终筛选基因数: {feat_count}")
             
     except Exception as e:
         print(f"\n❌ CPCG 运行出错: {e}")
-        # traceback.print_exc() 
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == '__main__':

@@ -4,130 +4,128 @@ import sys
 import pandas as pd
 import numpy as np
 from scipy import stats
-from scipy.stats import f_oneway
 from pingouin import partial_corr
-import statsmodels.api as sm
 from lifelines.statistics import logrank_test
 from joblib import Parallel, delayed
 import warnings
+import time
+
 warnings.filterwarnings('ignore')
-
-try:
-    from tqdm import tqdm
-    HAS_TQDM = True
-except ImportError:
-    HAS_TQDM = False
-    print("⚠️  tqdm未安装，跳过进度条")
-
-np.seterr(divide='ignore',invalid='ignore')
+np.seterr(divide='ignore', invalid='ignore')
 
 def _process_single_gene_semi(gene_data, cd, h_type, gene_name):
     """
-    并行处理单个基因的筛选（半参数化版本）
-
-    Args:
-        gene_data: 单个基因的表达数据
-        cd: 临床数据
-        h_type: 生存类型
-        gene_name: 基因名
-
-    Returns:
-        tuple: (gene_name, logrank_p, corr_value) 或 (gene_name, None, None) 如果基因被跳过
+    单个基因的处理函数 (无状态，适合并行)
     """
     try:
-        # 合并基因表达数据
-        temp_data = gene_data.T.copy()
-        temp_data.columns = [gene_name]
-        temp_data = temp_data.drop(['gene_name'])
-
-        cd_copy = cd.copy()
-        cd_copy = cd_copy.merge(temp_data, how='left', left_index=True, right_index=True)
-
-        # 检查数据类型并转换
-        if gene_name not in cd_copy.columns:
+        # 1. 数据准备
+        # 转置并重命名，减少 merge 开销，直接赋值
+        # 注意: gene_data 是 (1, N_samples)
+        series_gene = gene_data.iloc[0]
+        
+        # 此时 cd 已经有了 case_submitter_id 作为 index
+        # 我们需要确保 series_gene 的 index (sample_id) 与 cd 的 index 对齐
+        
+        # 快速合并：利用 Pandas 索引对齐
+        # 先创建一个只包含该基因的 Series，索引为样本ID
+        
+        # 检查重叠样本
+        common_indices = cd.index.intersection(series_gene.index)
+        if len(common_indices) < 10: # 样本太少直接跳过
+            return (gene_name, None, None)
+            
+        # 提取对应数据
+        sub_cd = cd.loc[common_indices].copy()
+        sub_gene_vals = series_gene.loc[common_indices].astype(float)
+        
+        # 赋值
+        sub_cd[gene_name] = sub_gene_vals
+        
+        # 2. 缺失值清洗
+        sub_cd = sub_cd.dropna(subset=[gene_name, 'OS', 'Censor'])
+        if len(sub_cd) == 0:
             return (gene_name, None, None)
 
-        try:
-            cd_copy[gene_name] = cd_copy[gene_name].astype(float)
-        except (KeyError, ValueError):
-            return (gene_name, None, None)
+        # 3. 中位数分组
+        median_val = sub_cd[gene_name].median()
+        d_l = sub_cd[sub_cd[gene_name] <= median_val]
+        d_h = sub_cd[sub_cd[gene_name] > median_val]
 
-        # 检查缺失值
-        cd_copy = cd_copy.dropna(subset=[gene_name, 'OS', 'Censor'])
-
-        if len(cd_copy) == 0:
-            return (gene_name, None, None)
-
-        # 中位数分组
-        median_val = cd_copy[gene_name].median()
-        d_l = cd_copy[cd_copy[gene_name] <= median_val].copy()
-        d_h = cd_copy[cd_copy[gene_name] > median_val].copy()
-
-        # 检查分组样本数
+        # 分组样本检查
         if len(d_l) < 6 or len(d_h) < 6:
             return (gene_name, None, None)
 
-        # Logrank test
+        # 4. Logrank Test
         results = logrank_test(d_l['OS'], d_h['OS'], d_l['Censor'], d_h['Censor'])
-
         if results.p_value > 0.01:
             return (gene_name, None, None)
-
+            
         logrank_p = results.p_value / 2
 
-        # 偏相关分析
-        corr_pd = partial_corr(data=cd_copy, x=gene_name, y=h_type)
-        if corr_pd is not None and 'pearson' in corr_pd.index and 'r' in corr_pd.columns:
-            corr_value = np.abs(corr_pd.loc['pearson', 'r'])
-            return (gene_name, logrank_p, corr_value)
-        else:
-            return (gene_name, logrank_p, None)
+        # 5. 偏相关分析 (Partial Correlation)
+        # 注意: pingouin 可能会在极少数情况下报错或卡住，增加保护
+        try:
+            corr_pd = partial_corr(data=sub_cd, x=gene_name, y=h_type)
+            if corr_pd is not None and 'pearson' in corr_pd.index:
+                corr_value = np.abs(corr_pd.loc['pearson', 'r'])
+                return (gene_name, logrank_p, corr_value)
+        except Exception:
+            pass # 偏相关计算失败，视为无效
+            
+        return (gene_name, logrank_p, None)
 
     except Exception as e:
+        # 捕获所有未知错误，防止中断进程
         return (gene_name, None, None)
 
 def screen_step_2(clinical_final, exp_data, h_type, threshold=100, n_jobs=-1):
     """
-    Stage1半参数化筛选（并行化版本）
-
-    Args:
-        clinical_final: 临床数据
-        exp_data: 表达数据
-        h_type: 生存类型
-        threshold: 基因筛选阈值
-        n_jobs: 并行作业数，-1表示使用所有CPU核心
-
-    Returns:
-        筛选后的结果数据
+    Stage 1 半参数化筛选 (强制并行版)
     """
-    print(f"🔄 Stage1 Semi-Parametric筛选启动 (并行作业数: {n_jobs if n_jobs != -1 else '所有核心'})")
-
+    print(f"🔄 Stage1 Semi-Parametric 启动 (Target n_jobs={n_jobs})")
+    
+    # 预处理临床数据
     cd = clinical_final.copy()
+    # 确保使用 case_submitter_id 作为索引，方便后续对齐
+    if 'case_submitter_id' in cd.columns:
+        cd.index = cd['case_submitter_id'].values
+    elif 'case_id' in cd.columns:
+        cd.index = cd['case_id'].values
+        
+    # 准备表达数据
     ed = exp_data.copy()
-
-    cd.index = cd['case_submitter_id'].values
-
-    # 准备基因列表
+    # 确保 gene_name 是列而不是索引 (如果是索引，reset一下)
+    if ed.index.name == 'gene_name':
+        ed.reset_index(inplace=True)
+        
     gene_names = ed['gene_name'].tolist()
+    print(f"📊 待处理基因总数: {len(gene_names)}")
 
-    # 并行处理所有基因
-    print(f"📊 正在并行处理 {len(gene_names)} 个基因...")
+    # ---------------------------------------------------------
+    # 并行执行核心
+    # ---------------------------------------------------------
+    # 使用 joblib 的 verbose 来显示进度，backend='loky' 通常最稳定
+    # pre_dispatch 控制任务分发，'2*n_jobs' 可以防止内存爆满
+    
+    # 为了减少序列化开销，我们不直接传 ed[aa:aa+1]，而是只传 numpy array 或者 series?
+    # 但为了保持逻辑简单且兼容旧代码结构，我们还是传切片，但要注意内存。
+    
+    # 如果 n_jobs 为 -1，但在容器中可能识别错误，建议限制最大值 (如 16)
+    # 这里我们信任用户设置，但增加 batch_size 优化
+    
+    results = Parallel(n_jobs=n_jobs, verbose=5, pre_dispatch='2*n_jobs')(
+        delayed(_process_single_gene_semi)(
+            ed.iloc[aa:aa+1], # 传入单行 DataFrame
+            cd,               # 传入临床数据 (所有进程共享内存)
+            h_type, 
+            gene_names[aa]
+        ) 
+        for aa in range(len(gene_names))
+    )
 
-    # 使用tqdm进度条（如果有的话）
-    if HAS_TQDM:
-        pbar = tqdm(total=len(gene_names), desc="筛选基因", unit="个")
-        results = []
-        for aa in range(len(gene_names)):
-            results.append(_process_single_gene_semi(ed[aa:aa+1], cd, h_type, gene_names[aa]))
-            pbar.update(1)
-        pbar.close()
-    else:
-        results = Parallel(n_jobs=n_jobs)(
-            delayed(_process_single_gene_semi)(ed[aa:aa+1], cd, h_type, gene_names[aa])
-            for aa in range(len(gene_names))
-        )
-
-    # 整理结果
+    # ---------------------------------------------------------
+    # 结果汇总
+    # ---------------------------------------------------------
     table = pd.DataFrame(index=gene_names, columns=['corr', 'logrank'])
     valid_count = 0
 
@@ -137,69 +135,37 @@ def screen_step_2(clinical_final, exp_data, h_type, threshold=100, n_jobs=-1):
             table.loc[gene_name, 'corr'] = corr_value
             valid_count += 1
 
-    print(f"✅ 并行处理完成，有效基因: {valid_count}/{len(gene_names)}")
+    print(f"✅ 处理完成. 有效基因数: {valid_count}/{len(gene_names)}")
 
-    # 排序并筛选
-    table = table.dropna(axis=0, how='all')
-    table['corr'] = table['corr'].astype(float)
-    table['logrank'] = table['logrank'].astype(float)
+    # 筛选逻辑
+    table = table.dropna()
+    
+    if table.empty:
+        print("❌ 警告: 没有基因通过筛选 (可能阈值过严或数据问题)")
+        return pd.DataFrame() # 返回空
 
     if table.shape[0] < threshold:
-        print(f'⚠️  有效基因数({table.shape[0]}) < 阈值({threshold})，调整阈值')
+        print(f"⚠️  警告: 有效基因不足 ({table.shape[0]} < {threshold})，全部保留")
         threshold = table.shape[0]
 
-    if threshold == 0:
-        print("❌ 没有基因通过筛选，返回空结果")
-        return pd.DataFrame()
+    # 排序取 Top N
+    # 优先级: 相关性 abs(corr) 越大越好
+    table['corr'] = table['corr'].astype(float)
+    corr_index = table.sort_values(by='corr', ascending=False).head(threshold).index.tolist()
 
-    # 按相关性排序并筛选前threshold个
-    corr_index = table.sort_values(by='corr', ascending=False).iloc[0:threshold, :].index.tolist()
-
-    # 构建最终结果
-    ed.index = ed['gene_name'].values
-
-    result = pd.DataFrame()
-    result.index = cd.index
-    result = pd.merge(result, cd[['Censor', h_type, 'OS']], how='left', left_index=True, right_index=True)
-    result = pd.merge(
-        result,
-        ed.loc[corr_index, :].drop(columns='gene_name').T,
-        how='left',
-        left_index=True,
-        right_index=True
-    )
-
-    print(f"✅ Stage1 Semi-Parametric筛选完成，保留 {len(corr_index)} 个基因")
+    # 构建返回结果
+    # 需要将选中的基因表达量合并回 clinical data
+    # ed 需要设回 index
+    ed_indexed = ed.set_index('gene_name')
+    
+    # 提取选中基因的表达量 (转置: 行=样本, 列=基因)
+    selected_exp = ed_indexed.loc[corr_index].T
+    
+    # 合并
+    result = pd.merge(cd, selected_exp, left_index=True, right_index=True, how='inner')
+    
+    print(f"✅ Stage1 Semi-Parametric 筛选结束，输出形状: {result.shape}")
     return result
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Stage1 Semi-Parametric Screen')
-    parser.add_argument('--clinical', required=True, help='Clinical data file')
-    parser.add_argument('--exp', required=True, help='Expression data file')
-    parser.add_argument('--output', required=True, help='Output directory')
-    parser.add_argument('--h_type', default='OS', help='Hazard type')
-
-    args = parser.parse_args()
-
-    print("开始Stage1 Semi-Parametric筛选...")
-    print(f"  临床文件: {args.clinical}")
-    print(f"  表达文件: {args.exp}")
-    print(f"  输出目录: {args.output}")
-
-    # 读取数据
-    clinical_final = pd.read_csv(args.clinical)
-    exp_data = pd.read_csv(args.exp)
-
-    # 运行筛选
-    result = screen_step_2(clinical_final, exp_data, args.h_type)
-
-    # 保存结果
-    import os
-    os.makedirs(args.output, exist_ok=True)
-    output_file = os.path.join(args.output, 'stage1_parametric_result.csv')
-    result.to_csv(output_file)
-
-    print(f"✅ Stage1 Semi-Parametric完成!")
-    print(f"  输出文件: {output_file}")
-    print(f"  筛选基因数: {result.shape[1] - 2}")
-    print(f"  样本数: {result.shape[0]}")
+    pass
