@@ -7,3 +7,17 @@ biobert/
 results/
 __pycache__/
 .DS_Store
+
+# 可视化文件
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.pdf
+*.eps
+*.bmp
+*.tiff
+*.webp
+*.html
+*.htm
