@@ -1359,7 +1359,8 @@ def _step_with_train_test_results(cur, args, loss_fn, model, optimizer, schedule
     修改后的_step函数，同时获取训练集和测试集结果
     """
     all_survival = _extract_survival_metadata(train_loader, val_loader)
-    best_c_index = 0.0
+    # 【修改】初始值从0.0改为-1.0，确保第一个epoch能保存结果
+    best_c_index = -1.0
     best_test_results = None
     best_train_results = None
     best_model_path = os.path.join(args.results_dir, f'best_model_fold_{cur}.pth')
@@ -1376,7 +1377,8 @@ def _step_with_train_test_results(cur, args, loss_fn, model, optimizer, schedule
             args.dataset_factory, model, args.modality, val_loader, loss_fn, all_survival, args.enable_multitask,
             save_visualizations=True, dataset_name=dataset_name, fold_idx=cur)
 
-        if val_cindex > best_c_index and best_c_index < 1.0:
+        # 【修改】第一个epoch或val_cindex更大时强制保存
+        if epoch == 0 or val_cindex > best_c_index:
             best_c_index = val_cindex
             best_test_results = results_dict.copy()
 
@@ -1410,103 +1412,119 @@ def generate_km_plot_and_save_data(train_results, test_results, dataset_name, sa
     """
     print("🎨 Generating Kaplan-Meier plot for the full cohort...")
 
-    # 1. Merge training and testing data
-    all_results = {**train_results, **test_results}
-    
-    # 2. Convert results to a DataFrame for saving and plotting
-    case_ids = list(all_results.keys())
-    times = [data['time'] for data in all_results.values()]
-    risks = [data['risk'] for data in all_results.values()]
-    censorships = [data['censorship'] for data in all_results.values()]
-    
-    df_for_plotting = pd.DataFrame({
-        'case_id': case_ids,
-        'time': times,
-        'risk': risks,
-        'censorship': censorships,
-        'event': [1 - c for c in censorships]
-    })
-    
-    # Stratify patients into high- and low-risk groups based on the median risk score
-    median_risk = np.median(df_for_plotting['risk'])
-    df_for_plotting['risk_group'] = np.where(df_for_plotting['risk'] >= median_risk, 'high risk', 'low risk')
+    # 【新增】空值检查：如果传入的结果为None，直接返回默认值
+    if train_results is None or test_results is None:
+        print("⚠️  警告: train_results 或 test_results 为 None，跳过KM图生成")
+        sample_counts = {'high_risk': 0, 'low_risk': 0}
+        return 1.0, sample_counts, None  # 返回p-value=1.0表示无显著差异
 
-    # 3. Save the plotting data to a CSV file
-    data_save_path = None
-    if save_dir:
-        data_save_path = os.path.join(save_dir, f'{dataset_name}_km_plot_data.csv')
-        df_for_plotting.to_csv(data_save_path, index=False)
-        print(f"📁 KM plot data saved to: {data_save_path}")
+    # 【新增】将整个绘图逻辑包裹在try...except中，防止matplotlib崩溃
+    try:
+        # 1. Merge training and testing data
+        all_results = {**train_results, **test_results}
 
-    # 4. Create the Kaplan-Meier plot
-    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-    
-    # Separate data by risk group
-    high_risk_data = df_for_plotting[df_for_plotting['risk_group'] == 'high risk']
-    low_risk_data = df_for_plotting[df_for_plotting['risk_group'] == 'low risk']
-    
-    # === [修复] 检查是否有空组，避免KM图生成失败 ===
-    if len(high_risk_data) == 0 or len(low_risk_data) == 0:
-        print(f"⚠️  警告: 风险分组不均衡 (high_risk: {len(high_risk_data)}, low_risk: {len(low_risk_data)})")
-        print(f"⚠️  所有样本risk值相同或接近，跳过KM图生成")
-        
-        # 检查risk值分布
-        unique_risks = df_for_plotting['risk'].nunique()
-        print(f"⚠️  唯一risk值数量: {unique_risks}")
-        
-        ax.text(0.5, 0.5, f'无法生成KM图\n风险分组不均衡\nhigh_risk: {len(high_risk_data)}\nlow_risk: {len(low_risk_data)}', 
-                ha='center', va='center', transform=ax.transAxes, fontsize=12)
-        ax.set_title(f'{dataset_name}\n(KM plot skipped - unbalanced groups)', fontsize=14)
-        
+        # 2. Convert results to a DataFrame for saving and plotting
+        case_ids = list(all_results.keys())
+        times = [data['time'] for data in all_results.values()]
+        risks = [data['risk'] for data in all_results.values()]
+        censorships = [data['censorship'] for data in all_results.values()]
+
+        df_for_plotting = pd.DataFrame({
+            'case_id': case_ids,
+            'time': times,
+            'risk': risks,
+            'censorship': censorships,
+            'event': [1 - c for c in censorships]
+        })
+
+        # Stratify patients into high- and low-risk groups based on the median risk score
+        median_risk = np.median(df_for_plotting['risk'])
+        df_for_plotting['risk_group'] = np.where(df_for_plotting['risk'] >= median_risk, 'high risk', 'low risk')
+
+        # 3. Save the plotting data to a CSV file
+        data_save_path = None
         if save_dir:
-            figure_save_path = os.path.join(save_dir, f'{dataset_name}_km_plot_skipped.png')
-            plt.savefig(figure_save_path, dpi=300, bbox_inches='tight', facecolor='white')
-            print(f"🖼️ 占位图已保存到: {figure_save_path}")
-        
-        plt.close()
-        
-        sample_counts = {'high_risk': len(high_risk_data), 'low_risk': len(low_risk_data)}
-        return 1.0, sample_counts, data_save_path  # 返回p_value=1.0表示无显著差异
-    # ================================================
-    
-    # Fit data to Kaplan-Meier estimator
-    kmf_high = KaplanMeierFitter()
-    kmf_low = KaplanMeierFitter()
-    
-    kmf_low.fit(low_risk_data['time'], low_risk_data['event'], label=f"low risk (n={len(low_risk_data)})")
-    kmf_high.fit(high_risk_data['time'], high_risk_data['event'], label=f"high risk (n={len(high_risk_data)})")
-    
-    # Plot the survival functions
-    kmf_low.plot_survival_function(ax=ax, color='green', show_censors=True)
-    kmf_high.plot_survival_function(ax=ax, color='red', show_censors=True)
-    
-    # Perform log-rank test
-    results = logrank_test(
-        high_risk_data['time'], low_risk_data['time'],
-        event_observed_A=high_risk_data['event'], event_observed_B=low_risk_data['event']
-    )
-    p_value = results.p_value
-    
-    # Configure plot aesthetics
-    ax.set_xlabel('Timeline (month)', fontsize=12)
-    ax.set_ylabel('Cumulative proportion surviving', fontsize=12)
-    ax.set_title(f'{dataset_name}\n(P-value: {p_value:.2e})', fontsize=14, fontweight='bold')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    
-    # Save the plot as an image file
-    if save_dir:
-        figure_save_path = os.path.join(save_dir, f'{dataset_name}_km_plot.png')
-        plt.savefig(figure_save_path, dpi=300, bbox_inches='tight', facecolor='white')
-        print(f"🖼️ KM plot image saved to: {figure_save_path}")
-    
-    plt.close()  # 使用plt.close()替代plt.show()避免阻塞
+            data_save_path = os.path.join(save_dir, f'{dataset_name}_km_plot_data.csv')
+            df_for_plotting.to_csv(data_save_path, index=False)
+            print(f"📁 KM plot data saved to: {data_save_path}")
 
-    sample_counts = {'high_risk': len(high_risk_data), 'low_risk': len(low_risk_data)}
-    
-    return p_value, sample_counts, data_save_path
+        # 4. Create the Kaplan-Meier plot
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+
+        # Separate data by risk group
+        high_risk_data = df_for_plotting[df_for_plotting['risk_group'] == 'high risk']
+        low_risk_data = df_for_plotting[df_for_plotting['risk_group'] == 'low risk']
+
+        # === [修复] 检查是否有空组，避免KM图生成失败 ===
+        if len(high_risk_data) == 0 or len(low_risk_data) == 0:
+            print(f"⚠️  警告: 风险分组不均衡 (high_risk: {len(high_risk_data)}, low_risk: {len(low_risk_data)})")
+            print(f"⚠️  所有样本risk值相同或接近，跳过KM图生成")
+
+            # 检查risk值分布
+            unique_risks = df_for_plotting['risk'].nunique()
+            print(f"⚠️  唯一risk值数量: {unique_risks}")
+
+            ax.text(0.5, 0.5, f'无法生成KM图\n风险分组不均衡\nhigh_risk: {len(high_risk_data)}\nlow_risk: {len(low_risk_data)}',
+                    ha='center', va='center', transform=ax.transAxes, fontsize=12)
+            ax.set_title(f'{dataset_name}\n(KM plot skipped - unbalanced groups)', fontsize=14)
+
+            if save_dir:
+                figure_save_path = os.path.join(save_dir, f'{dataset_name}_km_plot_skipped.png')
+                plt.savefig(figure_save_path, dpi=300, bbox_inches='tight', facecolor='white')
+                print(f"🖼️ 占位图已保存到: {figure_save_path}")
+
+            plt.close()
+
+            sample_counts = {'high_risk': len(high_risk_data), 'low_risk': len(low_risk_data)}
+            return 1.0, sample_counts, data_save_path  # 返回p_value=1.0表示无显著差异
+        # ================================================
+
+        # Fit data to Kaplan-Meier estimator
+        kmf_high = KaplanMeierFitter()
+        kmf_low = KaplanMeierFitter()
+
+        kmf_low.fit(low_risk_data['time'], low_risk_data['event'], label=f"low risk (n={len(low_risk_data)})")
+        kmf_high.fit(high_risk_data['time'], high_risk_data['event'], label=f"high risk (n={len(high_risk_data)})")
+
+        # Plot the survival functions
+        kmf_low.plot_survival_function(ax=ax, color='green', show_censors=True)
+        kmf_high.plot_survival_function(ax=ax, color='red', show_censors=True)
+
+        # Perform log-rank test
+        results = logrank_test(
+            high_risk_data['time'], low_risk_data['time'],
+            event_observed_A=high_risk_data['event'], event_observed_B=low_risk_data['event']
+        )
+        p_value = results.p_value
+
+        # Configure plot aesthetics
+        ax.set_xlabel('Timeline (month)', fontsize=12)
+        ax.set_ylabel('Cumulative proportion surviving', fontsize=12)
+        ax.set_title(f'{dataset_name}\n(P-value: {p_value:.2e})', fontsize=14, fontweight='bold')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+
+        # Save the plot as an image file
+        if save_dir:
+            figure_save_path = os.path.join(save_dir, f'{dataset_name}_km_plot.png')
+            plt.savefig(figure_save_path, dpi=300, bbox_inches='tight', facecolor='white')
+            print(f"🖼️ KM plot image saved to: {figure_save_path}")
+
+        plt.close()  # 使用plt.close()替代plt.show()避免阻塞
+
+        sample_counts = {'high_risk': len(high_risk_data), 'low_risk': len(low_risk_data)}
+
+        return p_value, sample_counts, data_save_path
+
+    except Exception as e:
+        # 【新增】捕获matplotlib等绘图相关异常，防止程序崩溃
+        print(f"❌ 绘图过程中发生错误: {e}")
+        print("⚠️  已跳过KM图生成，返回默认值")
+
+        sample_counts = {'high_risk': 0, 'low_risk': 0}
+        return 1.0, sample_counts, None
 
 # Modified main training function to call the new plotting function
 def _train_val_with_km_plots(datasets, cur, args):
