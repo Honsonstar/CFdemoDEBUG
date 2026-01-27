@@ -1,7 +1,18 @@
 #!/bin/bash
-# 训练所有折的脚本
+# 训练所有折的脚本 (并行版本)
 
 STUDY=$1
+
+# ============================================================
+# 【新增】GPU性能优化配置
+# ============================================================
+# 最大并发任务数 - 根据GPU显存调整
+# 推荐值: 3-4 (基于22% GPU利用率观察)
+# 如果遇到OOM，尝试减少到2或1
+MAX_JOBS=4
+
+# GPU显存安全阈值 (可选配置)
+# GPU_MEMORY_FRACTION=0.8  # 使用80%的GPU显存
 
 if [ -z "$STUDY" ]; then
     echo "=========================================="
@@ -9,25 +20,35 @@ if [ -z "$STUDY" ]; then
     echo ""
     echo "示例:"
     echo "  bash train_all_folds.sh blca"
+    echo ""
+    echo "配置:"
+    echo "  最大并发任务数: MAX_JOBS=$MAX_JOBS"
+    echo "  调整方法: MAX_JOBS=3 bash train_all_folds.sh blca"
     echo "=========================================="
     exit 1
 fi
 
 echo "=========================================="
-echo "训练所有折 (嵌套CV)"
+echo "训练所有折 (并行版本 - 嵌套CV)"
 echo "=========================================="
 echo "   癌种: $STUDY"
+echo "   最大并发任务数: $MAX_JOBS"
 echo "=========================================="
+
+# ============================================================
+# 【修改】使用外部提供的5折划分
+# ============================================================
+SPLIT_DIR="/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/5foldcv_ramdom/tcga_${STUDY}"
 
 # 检查必要文件
 echo "\n🔍 检查必要文件..."
 
 MISSING_FILES=0
 
-# 检查嵌套划分文件
+# 检查外部划分文件
 for fold in {0..4}; do
-    if [ ! -f "splits/nested_cv/${STUDY}/nested_splits_${fold}.csv" ]; then
-        echo "❌ 缺少: splits/nested_cv/${STUDY}/nested_splits_${fold}.csv"
+    if [ ! -f "${SPLIT_DIR}/splits_${fold}.csv" ]; then
+        echo "❌ 缺少: ${SPLIT_DIR}/splits_${fold}.csv"
         MISSING_FILES=1
     fi
 done
@@ -42,7 +63,9 @@ done
 
 if [ $MISSING_FILES -eq 1 ]; then
     echo "\n⚠️  缺少必要文件，请先运行:"
-    echo "   bash create_nested_splits.sh $STUDY"
+    echo "   # 确保外部划分文件位于:"
+    echo "   #   ${SPLIT_DIR}/"
+    echo "   # 然后运行CPCG筛选:"
     echo "   bash run_all_cpog.sh $STUDY"
     exit 1
 fi
@@ -55,22 +78,65 @@ mkdir -p "$RESULTS_DIR"
 
 echo "\n📁 结果目录: $RESULTS_DIR"
 
-# 训练所有折
-echo "\n🚀 开始训练所有折..."
+# 训练所有折 (并行版本)
+echo "\n🚀 开始并行训练所有折..."
+echo "=========================================="
+echo "   最大并发任务数: $MAX_JOBS"
+echo "   日志模式: 文件写入 (安静模式)"
 echo "=========================================="
 
+# 并行训练变量
+declare -a JOB_PIDS=()
+declare -a JOB_START_TIMES=()
+declare -a JOB_FOLDS=()
+job_count=0
+
+# 并行启动所有训练任务
 for fold in {0..4}; do
+    # 等待直到有可用的GPU槽位
+    while [ ${#JOB_PIDS[@]} -ge $MAX_JOBS ]; do
+        # 检查是否有已完成的任务
+        for i in "${!JOB_PIDS[@]}"; do
+            pid=${JOB_PIDS[i]}
+            if ! kill -0 "$pid" 2>/dev/null; then
+                # 任务已完成
+                wait "$pid"
+                end_time=$(date +%s)
+                duration=$((end_time - JOB_START_TIMES[i]))
+                echo ""
+                echo "✅ Fold ${JOB_FOLDS[$i]} 完成 (PID: $pid, 耗时: ${duration}s)"
+
+                # 从数组中移除
+                unset 'JOB_PIDS[i]'
+                unset 'JOB_START_TIMES[i]'
+                unset 'JOB_FOLDS[i]'
+
+                # 重新索引数组
+                JOB_PIDS=("${JOB_PIDS[@]}")
+                JOB_START_TIMES=("${JOB_START_TIMES[@]}")
+                JOB_FOLDS=("${JOB_FOLDS[@]}")
+                break
+            fi
+        done
+
+        # 如果仍在满负载状态，等待1秒后重试
+        if [ ${#JOB_PIDS[@]} -ge $MAX_JOBS ]; then
+            sleep 1
+        fi
+    done
+
+    # 启动新任务
     echo ""
-    echo ">>> Fold $fold / 4 <<<"
-    echo "=========================================="
+    echo "🚀 启动 Fold $fold (当前并发: ${#JOB_PIDS[@]}/$MAX_JOBS)"
 
-    START=$(date +%s)
+    start_time=$(date +%s)
 
+    # 静默模式：日志只写入文件，不输出到终端
     python3 main.py \
         --study tcga_${STUDY} \
         --k_start $fold \
         --k_end $((fold + 1)) \
-        --split_dir "splits/nested_cv/${STUDY}" \
+        --split_dir "${SPLIT_DIR}" \
         --results_dir "$RESULTS_DIR/fold_${fold}" \
         --seed $((42 + fold)) \
         --label_file datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv \
@@ -95,19 +161,27 @@ for fold in {0..4}; do
         --encoding_layer_1_dim 8 \
         --encoding_layer_2_dim 16 \
         --encoder_dropout 0.25 \
-        2>&1 | tee "$RESULTS_DIR/fold_${fold}.log"
+        >> "$RESULTS_DIR/fold_${fold}.log" 2>&1 &
 
-    END=$(date +%s)
-    DURATION=$((END - START))
-
-    echo ""
-    echo "✅ Fold $fold 完成 (耗时: ${DURATION}s)"
+    pid=$!
+    JOB_PIDS+=($pid)
+    JOB_START_TIMES+=($start_time)
+    JOB_FOLDS+=($fold)
 done
 
+# 等待所有后台任务完成
+echo ""
+echo "⏳ 等待所有训练任务完成..."
+wait
+
+echo ""
+echo "✅ 所有训练任务已完成!"
+
 # 汇总结果
-echo "\n" + "="*50)
+echo ""
+echo "=================================================="
 echo "📊 汇总所有折的结果"
-echo "="*50
+echo "=================================================="
 
 python3 << PYTHON
 import pandas as pd
