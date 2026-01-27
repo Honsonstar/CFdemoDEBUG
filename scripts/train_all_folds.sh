@@ -63,20 +63,43 @@ for fold in {0..4}; do
     echo ""
     echo ">>> Fold $fold / 4 <<<"
     echo "=========================================="
-    
+
     START=$(date +%s)
-    
-    python3 main_nested.py \
+
+    python3 main.py \
         --study tcga_${STUDY} \
-        --fold $fold \
-        --label_file datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv \
+        --k_start $fold \
+        --k_end $((fold + 1)) \
+        --split_dir "splits/nested_cv/${STUDY}" \
         --results_dir "$RESULTS_DIR/fold_${fold}" \
         --seed $((42 + fold)) \
+        --label_file datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv \
+        --task survival \
+        --n_classes 4 \
+        --modality snn \
+        --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" \
+        --data_root_dir "data/${STUDY}/pt_files" \
+        --label_col survival_months \
+        --type_of_path combine \
+        --max_epochs 20 \
+        --lr 0.00005 \
+        --opt adam \
+        --reg 0.00001 \
+        --alpha_surv 0.5 \
+        --weighted_sample \
+        --batch_size 1 \
+        --bag_loss nll_surv \
+        --encoding_dim 256 \
+        --num_patches 4096 \
+        --wsi_projection_dim 256 \
+        --encoding_layer_1_dim 8 \
+        --encoding_layer_2_dim 16 \
+        --encoder_dropout 0.25 \
         2>&1 | tee "$RESULTS_DIR/fold_${fold}.log"
-    
+
     END=$(date +%s)
     DURATION=$((END - START))
-    
+
     echo ""
     echo "✅ Fold $fold 完成 (耗时: ${DURATION}s)"
 done

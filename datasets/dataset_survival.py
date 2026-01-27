@@ -4,7 +4,6 @@ import os
 import pdb
 from unittest import case
 import pandas as pd
-import dgl 
 import pickle
 import networkx as nx
 import numpy as np
@@ -538,29 +537,55 @@ class SurvivalDatasetFactory:
     def return_splits(self, args, csv_path, fold):
         r"""
         Create the train and val splits for the fold
-        
+
         Args:
             - self
-            - args : argspace.Namespace 
-            - csv_path : String 
-            - fold : Int 
-        
-        Return: 
-            - datasets : tuple 
-            
+            - args : argspace.Namespace
+            - csv_path : String
+            - fold : Int
+
+        Return:
+            - datasets : tuple
+
         """
 
-        assert csv_path 
+        assert csv_path
         all_splits = pd.read_csv(csv_path)
-        #修改0117
-        # print("Defining datasets...")
-        # train_split, scaler = self._get_split_from_df(args, all_splits=all_splits, split_key='train', fold=fold, scaler=None)
-        # val_split = self._get_split_from_df(args, all_splits=all_splits, split_key='val', fold=fold, scaler=scaler)
+
+        # ============================================================
+        # 【新增逻辑】支持嵌套CV：加载该折专属的特征文件
+        # ============================================================
+        fold_feature_file = os.path.join(
+            f'features/{self.study}/fold_{fold}_genes.csv'
+        )
+
+        custom_omics_dict = None
+        if os.path.exists(fold_feature_file):
+            print(f"🔄 [Nested CV] Loading dynamic features for Fold {fold}: {fold_feature_file}")
+            # 读取该折的特征文件 (格式: sample_id, OS, gene1, gene2...)
+            fold_df = pd.read_csv(fold_feature_file, index_col=0) # 假设第一列是sample_id
+
+            # 剔除 OS 列，只保留基因
+            if 'OS' in fold_df.columns:
+                fold_df = fold_df.drop(columns=['OS'])
+
+            # 构造临时的 omics_dict 传给 Dataset
+            # 注意：这里我们替换掉了全局的 'rna' 数据
+            custom_omics_dict = copy.deepcopy(self.all_modalities)
+            custom_omics_dict['rna'] = fold_df
+
+            # 更新输入的基因维度，因为每一折选出来的基因数可能不一样
+            if hasattr(args, 'omic_sizes'):
+                # 假设 rna 是第一个模态
+                # 注意：如果你的模型是多模态固定输入维度的，这里可能会报错，
+                # 需要根据实际情况调整
+                args.omic_sizes[0] = len(fold_df.columns)
+                print(f"📏 [Nested CV] Updated omic_sizes[0] to {len(fold_df.columns)} for Fold {fold}")
 
         # [新代码] 自动兼容 'val' 或 'test' 列名
         print("Defining datasets...")
-        train_split, scaler = self._get_split_from_df(args, all_splits=all_splits, split_key='train', fold=fold, scaler=None)
-        
+        train_split, scaler = self._get_split_from_df(args, all_splits=all_splits, split_key='train', fold=fold, scaler=None, custom_omics_dict=custom_omics_dict)
+
         # === 修改开始 ===
         # 检查 CSV 里到底是用 'val' 还是 'test'
         if 'val' in all_splits.columns:
@@ -572,12 +597,15 @@ class SurvivalDatasetFactory:
             raise KeyError("切分文件中找不到 'val' 或 'test' 列！")
 
         print(f"Using split_key='{val_key}' for validation set.")
-        val_split = self._get_split_from_df(args, all_splits=all_splits, split_key=val_key, fold=fold, scaler=scaler)
+        val_split = self._get_split_from_df(args, all_splits=all_splits, split_key=val_key, fold=fold, scaler=scaler, custom_omics_dict=custom_omics_dict)
         # === 修改结束 ===
 
-        args.omic_sizes = args.dataset_factory.omic_sizes
+        # 如果没有嵌套CV特征文件，使用默认的 omic_sizes
+        if custom_omics_dict is None:
+            args.omic_sizes = args.dataset_factory.omic_sizes
+
         datasets = (train_split, val_split)
-        
+
         return datasets
 
     def _get_scaler(self, data):
@@ -619,23 +647,24 @@ class SurvivalDatasetFactory:
         
         return data
 
-    def _get_split_from_df(self, args, all_splits, split_key: str='train', fold = None, scaler=None, valid_cols=None):
+    def _get_split_from_df(self, args, all_splits, split_key: str='train', fold = None, scaler=None, valid_cols=None, custom_omics_dict=None):
         r"""
-        Initialize SurvivalDataset object for the correct split and after normalizing the RNAseq data 
-        
+        Initialize SurvivalDataset object for the correct split and after normalizing the RNAseq data
+
         Args:
-            - self 
-            - args: argspace.Namespace 
-            - all_splits: pd.DataFrame 
-            - split_key : String 
-            - fold : Int 
+            - self
+            - args: argspace.Namespace
+            - all_splits: pd.DataFrame
+            - split_key : String
+            - fold : Int
             - scaler : MinMaxScaler
-            - valid_cols : List 
+            - valid_cols : List
+            - custom_omics_dict : Dict (optional) - 用于嵌套CV的动态特征
 
         Returns:
-            - SurvivalDataset 
+            - SurvivalDataset
             - Optional: scaler (MinMaxScaler)
-        
+
         """
         sample = None
         if not scaler:
@@ -645,12 +674,22 @@ class SurvivalDatasetFactory:
 
         mask = self.label_data['case_id'].isin(split.tolist())
         df_metadata_slide = args.dataset_factory.label_data.loc[mask, :].reset_index(drop=True)
-        
+
+        # ============================================================
+        # 【新增逻辑】支持嵌套CV：使用自定义的特征文件
+        # ============================================================
+        # 如果传入了 custom_omics_dict，就用它的；否则用默认的
+        if custom_omics_dict is not None:
+            print(f"🔄 [Nested CV] Using custom omics dict for {split_key} split (Fold {fold})")
+            modalities_source = custom_omics_dict
+        else:
+            modalities_source = args.dataset_factory.all_modalities
+
         # select the rna, meth, mut, cnv data for this split
         omics_data_for_split = {}
-        for key in args.dataset_factory.all_modalities.keys():
-            
-            raw_data_df = args.dataset_factory.all_modalities[key]
+        for key in modalities_source.keys():
+
+            raw_data_df = modalities_source[key]
             mask = raw_data_df.index.isin(split.tolist())
             
             filtered_df = raw_data_df[mask]

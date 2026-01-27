@@ -728,25 +728,35 @@ def _update_arrays(all_risk_scores, all_censorships, all_event_times, all_clinic
 
 def _train_loop_survival(epoch, model, modality, loader, optimizer, scheduler, loss_fn, enable_multitask=False, use_debiase=True, use_align=False):
     r"""
-    Perform one epoch of training 
+    Perform one epoch of training
 
     Args:
         - epoch : Int
         - model : Pytorch model
-        - modality : String 
+        - modality : String
         - loader : Pytorch dataloader
         - optimizer : torch.optim
-        - loss_fn : custom loss function class 
+        - loss_fn : custom loss function class
         - enable_multitask : Boolean
-    
+
     Returns:
         - c_index : Float
-        - total_loss : Float 
+        - total_loss : Float
         - stage_accuracy : Float (if multitask enabled)
-    
+
     """
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.train()
+
+    # ============================================================
+    # 【新增】动态检测模型的 use_debias 设置，而不是硬编码
+    # ============================================================
+    if hasattr(model, 'use_debias'):
+        use_debiase = model.use_debias
+        print(f"🔍 [Debug] Detected model.use_debias = {use_debiase}")
+    else:
+        print(f"⚠️  [Warn] Model doesn't have 'use_debias' attribute, using passed value: {use_debiase}")
+
 
     total_loss = 0.
     total_survival_loss = 0.
@@ -988,6 +998,16 @@ def _summary(dataset_factory, model, modality, loader, loss_fn, survival_train=N
         - stage_accuracy : Float (if multitask enabled)
 
     """
+
+    # ============================================================
+    # 【新增】动态检测模型的 use_debias 设置，而不是硬编码
+    # ============================================================
+    if hasattr(model, 'use_debias'):
+        use_debiase = model.use_debias
+        print(f"🔍 [Debug] Detected model.use_debias = {use_debiase}")
+    else:
+        print(f"⚠️  [Warn] Model doesn't have 'use_debias' attribute, using passed value: {use_debiase}")
+
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()
 

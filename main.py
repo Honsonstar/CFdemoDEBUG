@@ -22,7 +22,7 @@ def main(args):
 
     #----> prep for 5 fold cv study
     folds = _get_start_end(args)
-    
+
     #----> storing the val and test cindex for 5 fold cv
     all_val_cindex = []
     all_val_cindex_ipcw = []
@@ -30,16 +30,28 @@ def main(args):
     all_val_IBS = []
     all_val_iauc = []
     all_val_loss = []
-    
+
     # For multi-task learning
     if args.enable_multitask:
         all_val_stage_accuracy = []
 
     for i in folds:
-        
+
+        # ============================================================
+        # 【新增】支持嵌套CV：检查使用哪种文件名格式
+        # ============================================================
+        nested_csv_path = '{}/nested_splits_{}.csv'.format(args.split_dir, i)
+        standard_csv_path = '{}/splits_{}.csv'.format(args.split_dir, i)
+
+        if os.path.exists(nested_csv_path):
+            csv_path = nested_csv_path
+            print(f"Using nested CV splits: {csv_path}")
+        else:
+            csv_path = standard_csv_path
+
         datasets = args.dataset_factory.return_splits(
             args,
-            csv_path='{}/splits_{}.csv'.format(args.split_dir, i),
+            csv_path=csv_path,
             fold=i
         )
         
@@ -165,10 +177,22 @@ def main0(args):
         all_val_stage_accuracy = []
 
     for i in folds:
-        
+
+        # ============================================================
+        # 【新增】支持嵌套CV：检查使用哪种文件名格式
+        # ============================================================
+        nested_csv_path = '{}/nested_splits_{}.csv'.format(args.split_dir, i)
+        standard_csv_path = '{}/splits_{}.csv'.format(args.split_dir, i)
+
+        if os.path.exists(nested_csv_path):
+            csv_path = nested_csv_path
+            print(f"Using nested CV splits: {csv_path}")
+        else:
+            csv_path = standard_csv_path
+
         datasets = args.dataset_factory.return_splits(
             args,
-            csv_path='{}/splits_{}.csv'.format(args.split_dir, i),
+            csv_path=csv_path,
             fold=i
         )
         
