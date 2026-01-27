@@ -565,6 +565,9 @@ class SurvivalDatasetFactory:
             # 读取该折的特征文件 (格式: sample_id, OS, gene1, gene2...)
             fold_df = pd.read_csv(fold_feature_file, index_col=0) # 假设第一列是sample_id
 
+            # 【优先级1】ID截取逻辑：确保ID格式匹配（截取前12位）
+            fold_df.index = fold_df.index.str[:12]
+
             # 剔除 OS 列，只保留基因
             if 'OS' in fold_df.columns:
                 fold_df = fold_df.drop(columns=['OS'])
@@ -603,6 +606,9 @@ class SurvivalDatasetFactory:
         # 如果没有嵌套CV特征文件，使用默认的 omic_sizes
         if custom_omics_dict is None:
             args.omic_sizes = args.dataset_factory.omic_sizes
+
+        # 【优先级2】调试打印：检查训练集大小
+        print(f"DEBUG: Train Set Size: {len(train_split)}")
 
         datasets = (train_split, val_split)
 
