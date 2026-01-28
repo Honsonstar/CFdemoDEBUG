@@ -96,12 +96,12 @@ class NestedCVFeatureSelector:
         # Stage 1
         print("  1. Stage 1 (Parametric)...")
         # 参数化模型仅用死亡样本
-        res_p = screen_step_1(clin[clin['Censor']==1].copy(), exp_data.copy().reset_index().rename(columns={"Unnamed: 0": "gene_name"}), h_type='OS', threshold=self.threshold, n_jobs=self.n_jobs)
+        res_p = screen_step_1(clin[clin['Censor']==1].copy(), exp_data_T, h_type='OS', threshold=self.threshold, n_jobs=self.n_jobs)
         genes_p = [c for c in res_p.columns if c != 'OS']
 
         print("  2. Stage 1 (Semi-Parametric)...")
         # 半参数化使用全量样本
-        res_sp = screen_step_2(clin.copy(), exp_data.copy().reset_index().rename(columns={"Unnamed: 0": "gene_name"}), h_type='OS', threshold=self.threshold, n_jobs=self.n_jobs)
+        res_sp = screen_step_2(clin.copy(), exp_data_T, h_type='OS', threshold=self.threshold, n_jobs=self.n_jobs)
         genes_sp = [c for c in res_sp.columns if c not in ['OS', 'Censor', 'censorship']]
 
         # 【修复】过滤掉临床特征列和非基因列
@@ -111,7 +111,7 @@ class NestedCVFeatureSelector:
             'age', 'is_female', 'stage', 'grade', 'site',
             'censorship', 'censorship_dss', 'censorship_pfi',
             'survival_months', 'survival_months_dss', 'survival_months_pfi',
-            'OS', 'Censor', 'Unnamed: 0', 'oncotree_code', 'slide_id'
+            'OS', 'Censor', 'index', 'oncotree_code', 'slide_id'
         }
 
         genes_p_filtered = [g for g in genes_p if g not in clinical_features]
@@ -152,14 +152,15 @@ class NestedCVFeatureSelector:
         all_ids = set(train_ids + val_ids + test_ids)
         merged = merged[merged.index.isin(all_ids)]
 
-        # 转置：变为行=基因，列=样本，供 PC 算法使用
-        merged_T = merged.T
-        merged_T.index.name = 'gene_name'
-        merged_T = merged_T.reset_index()
+        # 【关键修复】不要转置！
+        # Stage 2 的 PC 算法期望：行=样本, 列=变量（基因+OS）
+        # 转置后的 merged_T 会导致：行=变量, 列=样本
+        # 这会让 PC 算法计算"样本与样本"的相关性，而不是"基因与基因"的相关性
 
         # 调试 Stage 2 输入
         print(f"  [Debug Stage 2] merged shape: {merged.shape}")
-        print(f"  [Debug Stage 2] merged columns (前5): {list(merged.columns[:5])}")
+        print(f"  [Debug Stage 2] 行（样本）: {len(merged)}")
+        print(f"  [Debug Stage 2] 列（基因+OS）: {len(merged.columns)}")
         print(f"  [Debug Stage 2] OS in columns: {'OS' in merged.columns}")
 
         if merged.empty:
@@ -168,7 +169,7 @@ class NestedCVFeatureSelector:
             print(f"  -> Fallback: 取前 {len(fallback_genes)} 个基因")
             return fallback_genes
 
-        final_df = cs_step_2(merged_T, hazard_type="OS")
+        final_df = cs_step_2(merged, hazard_type="OS")
         final_genes = [c for c in final_df.columns if c != 'OS']
 
         if final_genes:
