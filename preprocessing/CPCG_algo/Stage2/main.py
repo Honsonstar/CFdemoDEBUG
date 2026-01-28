@@ -113,10 +113,16 @@ def cs_step_2(result_cs1, hazard_type):
             # 扩展到距离2的邻居（Markov Blanket 近似）
             neighbors = list(nx.single_source_shortest_path_length(G_nx, OS_idx, cutoff=2).keys())
             c_label = [labels[i] for i in neighbors]
-            
-            # 【修复点】移除错误的 print(fl...)，改为通用日志
-            print(f"    [Stage2] PC算法筛选完成: 从 {len(labels)-1} -> {len(c_label)-1} 个基因")
-            
+
+            # 计算原始基因数（排除 OS）
+            original_genes = len(labels) - 1
+
+            # 统计保留的基因数
+            retained_genes = len(c_label) - 1 if hazard_type in c_label else len(c_label)
+
+            print(f"    [Stage2] PC算法骨架边数: {G.sum()//2}")
+            print(f"    [Stage2] PC算法筛选完成: 从 {original_genes} -> {retained_genes} 个基因")
+
             return data.loc[:, c_label]
         else:
             print(f"    [Stage2] 警告: 数据中找不到 {hazard_type} 列，返回原始数据")

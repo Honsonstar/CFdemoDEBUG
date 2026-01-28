@@ -56,11 +56,20 @@ def load_nested_cpog_genes(study):
         
         try:
             df = pd.read_csv(gene_file)
-            
-            # 【关键修复】基因名是列名，不是 'gene' 列的值
-            exclude_cols = ['sample_id', 'OS', 'Censor', 'case_id', 'Unnamed: 0', 'survival_months']
-            genes = [c for c in df.columns if c not in exclude_cols]
-            
+
+            # 【关键修复】基因名在行中（第一列，列名为 'gene_name'），不是列名
+            # 需要读取第一列的值作为基因列表
+            if 'gene_name' in df.columns:
+                genes = df['gene_name'].dropna().unique().tolist()
+            else:
+                # 兜底：尝试找可能的基因名列
+                id_cols = ['sample_id', 'case_id', 'Unnamed: 0', 'patient_id']
+                gene_col = [c for c in df.columns if c not in id_cols and c not in ['OS', 'Censor', 'survival_months']]
+                if gene_col:
+                    genes = df[gene_col[0]].dropna().unique().tolist()
+                else:
+                    genes = []
+
             if not genes:
                 print(f"⚠️ Fold {fold} 文件为空或无基因列")
             else:

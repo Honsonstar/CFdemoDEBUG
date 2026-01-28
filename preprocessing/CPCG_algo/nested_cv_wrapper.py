@@ -34,12 +34,15 @@ class NestedCVFeatureSelector:
 
         print(f"\n[{self.study}] Fold {fold}: 开始 CPCG 筛选 (Train={len(train_ids)})")
 
-        # 1. 读取表达数据
+        # 1. 读取表达数据 (正确结构: 行=样本ID, 列=基因名)
         exp_file = os.path.join(self.data_root_dir, self.study, 'rna_clean.csv')
         if not os.path.exists(exp_file):
             exp_file = os.path.join(self.data_root_dir, self.study, 'data.csv')
         if not os.path.exists(exp_file): raise FileNotFoundError(f"Missing exp data: {exp_file}")
-        exp_data = pd.read_csv(exp_file)
+        # 设置第一列为索引（样本ID）
+        exp_data = pd.read_csv(exp_file, index_col=0)
+        # 截断样本ID为12位
+        exp_data.index = [str(i)[:12] for i in exp_data.index]
 
         # 2. 读取临床数据
         clinical_file = f'datasets_csv/clinical_data/tcga_{self.study}_clinical.csv'
@@ -47,10 +50,10 @@ class NestedCVFeatureSelector:
         clinical_data = pd.read_csv(clinical_file)
         clinical_data['case_id_truncated'] = clinical_data['case_id'].str[:12]
 
-        # 3. 处理表达数据列名
-        sample_cols = exp_data.columns[1:]
-        exp_data.columns = ['gene_name'] + [c[:12] for c in sample_cols]
-        exp_data.set_index('gene_name', inplace=True)
+        # 3. 转置表达数据 (变为行=基因, 列=样本)，供 CPCG 算法使用
+        exp_data_T = exp_data.T
+        exp_data_T.index.name = 'gene_name'
+        exp_data_T = exp_data_T.reset_index()
 
         # 4. 筛选训练集 (使用 truncated ID 进行匹配)
         # 只有当 clinical data 中的短 ID 在我们的 train_ids (已转短 ID) 中时才保留
@@ -64,9 +67,9 @@ class NestedCVFeatureSelector:
             print("  ⚠️ Warning: Too few training samples matched! Check ID formats.")
             return [] # 避免后续报错
 
-        selected_genes = self._run_full_cpcg(train_clinical, exp_data)
-        
-        return self._generate_feature_file(fold, selected_genes, exp_data, train_ids + val_ids + test_ids)
+        selected_genes = self._run_full_cpcg(train_clinical, exp_data, exp_data_T)
+
+        return self._generate_feature_file(fold, selected_genes, exp_data_T, train_ids + val_ids + test_ids)
 
     def _prepare_data(self, clinical):
         df = clinical.copy()
@@ -82,7 +85,7 @@ class NestedCVFeatureSelector:
         if 'survival_months' in df.columns: df['OS'] = df['survival_months']
         return df
 
-    def _run_full_cpcg(self, clinical, exp_data):
+    def _run_full_cpcg(self, clinical, exp_data, exp_data_T=None):
         from Stage1_parametric_model.screen import screen_step_1
         from Stage1_semi_parametric_model.screen import screen_step_2
         from Stage2.main import cs_step_2
@@ -93,15 +96,36 @@ class NestedCVFeatureSelector:
         # Stage 1
         print("  1. Stage 1 (Parametric)...")
         # 参数化模型仅用死亡样本
-        res_p = screen_step_1(clin[clin['Censor']==1].copy(), exp_data.copy().reset_index(), h_type='OS', threshold=self.threshold, n_jobs=self.n_jobs)
+        res_p = screen_step_1(clin[clin['Censor']==1].copy(), exp_data.copy().reset_index().rename(columns={"Unnamed: 0": "gene_name"}), h_type='OS', threshold=self.threshold, n_jobs=self.n_jobs)
         genes_p = [c for c in res_p.columns if c != 'OS']
-        
+
         print("  2. Stage 1 (Semi-Parametric)...")
         # 半参数化使用全量样本
-        res_sp = screen_step_2(clin.copy(), exp_data.copy().reset_index(), h_type='OS', threshold=self.threshold, n_jobs=self.n_jobs)
+        res_sp = screen_step_2(clin.copy(), exp_data.copy().reset_index().rename(columns={"Unnamed: 0": "gene_name"}), h_type='OS', threshold=self.threshold, n_jobs=self.n_jobs)
         genes_sp = [c for c in res_sp.columns if c not in ['OS', 'Censor', 'censorship']]
-        
-        candidates = list(set(genes_p) | set(genes_sp))
+
+        # 【修复】过滤掉临床特征列和非基因列
+        # 已知需要排除的临床特征
+        clinical_features = {
+            'case_id', 'case_id_truncated', 'case_submitter_id', 'sample_id',
+            'age', 'is_female', 'stage', 'grade', 'site',
+            'censorship', 'censorship_dss', 'censorship_pfi',
+            'survival_months', 'survival_months_dss', 'survival_months_pfi',
+            'OS', 'Censor', 'Unnamed: 0', 'oncotree_code', 'slide_id'
+        }
+
+        genes_p_filtered = [g for g in genes_p if g not in clinical_features]
+        genes_sp_filtered = [g for g in genes_sp if g not in clinical_features]
+
+        # 统计过滤掉的列
+        filtered_out_p = set(genes_p) - set(genes_p_filtered)
+        filtered_out_sp = set(genes_sp) - set(genes_sp_filtered)
+
+        if filtered_out_p or filtered_out_sp:
+            print(f"  [过滤] 移除了 {len(filtered_out_p | filtered_out_sp)} 个非基因列")
+            print(f"       包括: {list(filtered_out_p | filtered_out_sp)[:10]}...")
+
+        candidates = list(set(genes_p_filtered) | set(genes_sp_filtered))
         print(f"  -> Stage 1 Candidates: {len(candidates)}")
 
         # Stage 2
@@ -110,35 +134,75 @@ class NestedCVFeatureSelector:
         id_col = 'case_id_truncated' if 'case_id_truncated' in clin.columns else 'case_id'
         clin_idx = clin.set_index(id_col)
         clin_idx.index = clin_idx.index.astype(str)
-        
-        exp_T = exp_data.T
-        exp_T.index = exp_T.index.astype(str)
-        
-        valid_genes = [g for g in candidates if g in exp_T.columns]
-        
-        # 合并数据
-        merged = pd.merge(clin_idx[['OS']], exp_T[valid_genes], left_index=True, right_index=True, how='inner')
-        
+
+        # 【修复】去除重复索引，保留第一个（避免 merge 失败）
+        if clin_idx.index.duplicated().any():
+            print(f"  [警告] 临床数据有 {clin_idx.index.duplicated().sum()} 个重复ID，去重处理")
+            clin_idx = clin_idx[~clin_idx.index.duplicated(keep='first')]
+
+        # 【关键修复】使用 exp_data (索引=样本ID) 直接 merge
+        # 合并临床数据和基因表达数据
+        merged = pd.merge(clin_idx[['OS']], exp_data[exp_data.columns[:]], left_index=True, right_index=True, how='inner')
+
+        # 只保留在候选基因列表中的列
+        gene_cols = [c for c in merged.columns if c in candidates and c != 'OS']
+        merged = merged[['OS'] + gene_cols]
+
+        # 过滤样本：只保留训练集、验证集、测试集的样本
+        all_ids = set(train_ids + val_ids + test_ids)
+        merged = merged[merged.index.isin(all_ids)]
+
+        # 转置：变为行=基因，列=样本，供 PC 算法使用
+        merged_T = merged.T
+        merged_T.index.name = 'gene_name'
+        merged_T = merged_T.reset_index()
+
+        # 调试 Stage 2 输入
+        print(f"  [Debug Stage 2] merged shape: {merged.shape}")
+        print(f"  [Debug Stage 2] merged columns (前5): {list(merged.columns[:5])}")
+        print(f"  [Debug Stage 2] OS in columns: {'OS' in merged.columns}")
+
         if merged.empty:
             print("  ⚠️ Stage 2 Empty Merge. Fallback to Stage 1.")
-            return candidates[:self.threshold]
-            
-        final_df = cs_step_2(merged, hazard_type='OS')
+            fallback_genes = candidates[:self.threshold]
+            print(f"  -> Fallback: 取前 {len(fallback_genes)} 个基因")
+            return fallback_genes
+
+        final_df = cs_step_2(merged_T, hazard_type="OS")
         final_genes = [c for c in final_df.columns if c != 'OS']
-        
-        return final_genes if final_genes else candidates[:self.threshold]
+
+        if final_genes:
+            print(f"  -> Stage 2 输出: {len(final_genes)} 个基因")
+            return final_genes
+        else:
+            print("  ⚠️ Stage 2 无输出，回退到 Stage 1")
+            fallback_genes = candidates[:self.threshold]
+            print(f"  -> Fallback: 取前 {len(fallback_genes)} 个基因")
+            return fallback_genes
 
     def _generate_feature_file(self, fold, genes, exp_data, ids):
-        out_file = os.path.join(self.temp_dir, f'{self.study}_fold_{fold}.csv')
-        valid_ids = [i for i in ids if i in exp_data.columns]
-        valid_genes = [g for g in genes if g in exp_data.index]
-        
+        # 直接保存到 features 目录（而不是临时目录）
+        features_dir = f'features/{self.study}'
+        os.makedirs(features_dir, exist_ok=True)
+        out_file = os.path.join(features_dir, f'fold_{fold}_genes.csv')
+
+        # exp_data 是转置后的数据：行=基因，列=样本（第一列是 'gene_name'）
+        # 样本ID在列中（除了第一列 'gene_name'）
+        sample_cols = [c for c in exp_data.columns if c != 'gene_name']
+        valid_ids = [i for i in ids if i in sample_cols]
+        valid_genes = genes  # genes 已经是基因名列表
+
         if not valid_genes:
+            print(f"   [Warning] No valid genes, creating empty file")
             pd.DataFrame(columns=['sample_id']+valid_ids).to_csv(out_file, index=False)
         else:
-            df = exp_data.loc[valid_genes, valid_ids].T
-            df.index.name = 'sample_id'
-            df.reset_index().to_csv(out_file, index=False)
+            # 选择有效的基因和样本
+            cols_to_select = ['gene_name'] + valid_ids
+            df = exp_data[cols_to_select].copy()
+            df = df[df['gene_name'].isin(valid_genes)]
+            df.to_csv(out_file, index=False)
+
+        print(f"   [Saved] {out_file}")
         return out_file
 
 if __name__ == '__main__':
