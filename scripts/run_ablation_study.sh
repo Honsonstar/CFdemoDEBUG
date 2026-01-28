@@ -58,7 +58,7 @@ SEED=42                    # 随机种子（保证可复现性）
 K_FOLDS=5                  # 交叉验证折数
 EPOCHS=20                  # 训练轮数
 LR=0.00005                 # 学习率
-MAX_JOBS=2                 # 最大并行任务数（避免GPU内存不足）
+MAX_JOBS=3                 # 最大并行任务数（避免GPU内存不足）
 # =========================================================
 
 # 创建日志和报告目录
@@ -77,7 +77,7 @@ echo "🚀 开始多模态消融实验: ${STUDY}" | tee -a "${MAIN_LOG}"
 echo "📁 日志目录: ${LOG_DIR}" | tee -a "${MAIN_LOG}"
 echo "==============================================" | tee -a "${MAIN_LOG}"
 
-# 【修复】强制使用单层路径，避免嵌套
+# 【修复】强制使用单层路径
 # 结果目录: results/ablation/{cancer}/{mode}/fold_{X}
 ABLRESULTS_DIR="results/ablation/${STUDY}"
 export ABLRESULTS_DIR  # 导出变量供Python子进程使用
@@ -228,22 +228,19 @@ export GENE_SUMMARY
 # 【加固】先等待所有后台任务完成（确保并行模式下文件已写入）
 wait
 
-# 【修复】使用 os.environ 获取环境变量，不再依赖Shell变量展开
+# 【修复】使用 os.environ 获取环境变量
 python3 << 'EOF_SUMMARY' | tee -a "${GENE_LOG}"
 import pandas as pd
 import glob
 import os
 import sys
 
-# 【修复】从环境变量获取路径
-results_dir = os.environ.get('ABLRESULTS_DIR', '') + '/gene'
+# 【修复】只使用单层路径
+base_path = os.environ.get('ABLRESULTS_DIR', '')
+results_dir = os.path.join(base_path, 'gene')
 gene_summary_path = os.environ.get('GENE_SUMMARY', '')
-print(f"📁 搜索结果目录: {results_dir}")
 
-# 检查目录是否存在
-if not os.path.exists(results_dir):
-    print(f"❌ 错误: 目录不存在 {results_dir}")
-    sys.exit(1)
+print(f"📁 搜索结果目录: {results_dir}")
 
 dfs = []
 missing_folds = []
@@ -330,13 +327,12 @@ import glob
 import os
 import sys
 
-results_dir = os.environ.get('ABLRESULTS_DIR', '') + '/text'
+# 【修复】只使用单层路径
+base_path = os.environ.get('ABLRESULTS_DIR', '')
+results_dir = os.path.join(base_path, 'text')
 text_summary_path = os.environ.get('TEXT_SUMMARY', '')
-print(f"📁 搜索结果目录: {results_dir}")
 
-if not os.path.exists(results_dir):
-    print(f"❌ 错误: 目录不存在 {results_dir}")
-    sys.exit(1)
+print(f"📁 搜索结果目录: {results_dir}")
 
 dfs = []
 missing_folds = []
@@ -414,13 +410,12 @@ import glob
 import os
 import sys
 
-results_dir = os.environ.get('ABLRESULTS_DIR', '') + '/fusion'
+# 【修复】只使用单层路径
+base_path = os.environ.get('ABLRESULTS_DIR', '')
+results_dir = os.path.join(base_path, 'fusion')
 fusion_summary_path = os.environ.get('FUSION_SUMMARY', '')
-print(f"📁 搜索结果目录: {results_dir}")
 
-if not os.path.exists(results_dir):
-    print(f"❌ 错误: 目录不存在 {results_dir}")
-    sys.exit(1)
+print(f"📁 搜索结果目录: {results_dir}")
 
 dfs = []
 missing_folds = []

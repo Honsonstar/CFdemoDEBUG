@@ -4,7 +4,7 @@ MAX_JOBS=4  # 并行数量
 
 if [ -z "$STUDY" ]; then echo "Usage: bash scripts/train_all_folds.sh <study>"; exit 1; fi
 
-SPLIT_DIR="/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/5foldcv_ramdom/tcga_${STUDY}"
+SPLIT_DIR="splits/nested_cv/${STUDY}"
 RESULTS_DIR="results/nested_cv/${STUDY}"
 mkdir -p "$RESULTS_DIR"
 rm -f "$RESULTS_DIR"/summary*.csv # 清理旧汇总

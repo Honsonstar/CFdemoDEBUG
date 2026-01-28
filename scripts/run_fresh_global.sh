@@ -42,25 +42,42 @@ if [ ! -f "$SPLIT_FILE" ]; then
     exit 1
 fi
 
-# 2. 运行 CPCG (借用 run_cpog_nested_cv.py)
+# 2. 运行 CPCG (使用新的 wrapper)
 echo "2️⃣  运行 CPCG 筛选 (这可能需要几分钟)..."
 # 使用 fold 999 作为标记
-python3 run_cpog_nested_cv.py --study "$STUDY" --fold 999 --split_file "$SPLIT_FILE"
+OUTPUT_FILE=$(python3 preprocessing/CPCG_algo/nested_cv_wrapper.py \
+    --study "$STUDY" \
+    --fold 999 \
+    --split_file "$SPLIT_FILE" \
+    --data_root_dir "datasets_csv/raw_rna_data/combine" 2>&1 | tail -1)
+
+# 提取输出文件路径（最后一行的 "输出文件: /tmp/xxx.csv"）
+SRC_FILE=$(echo "$OUTPUT_FILE" | grep "输出文件:" | awk '{print $NF}')
+
+if [ -z "$SRC_FILE" ] || [ ! -f "$SRC_FILE" ]; then
+    echo "❌ 筛选失败，未找到结果文件"
+    echo "原始输出: $OUTPUT_FILE"
+    exit 1
+fi
+
+# 复制到 features 目录
+mkdir -p "features/${STUDY}"
+DEST_FILE="features/${STUDY}/fold_999_genes.csv"
+cp "$SRC_FILE" "$DEST_FILE"
+echo "✅ 已复制结果到: $DEST_FILE"
 
 # 3. 归档结果
 echo "3️⃣  归档结果..."
-# run_cpog_nested_cv.py 默认输出到 features/$STUDY/fold_999_genes.csv
-SRC_FILE="features/${STUDY}/fold_999_genes.csv"
 DEST_DIR="results/comparison/${STUDY}"
 mkdir -p "$DEST_DIR"
-DEST_FILE="${DEST_DIR}/global_genes.csv"
+FINAL_FILE="${DEST_DIR}/global_genes.csv"
 
-if [ -f "$SRC_FILE" ]; then
-    cp "$SRC_FILE" "$DEST_FILE"
-    echo "✅ 新的全局基准已保存: $DEST_FILE"
-    
+if [ -f "$DEST_FILE" ]; then
+    cp "$DEST_FILE" "$FINAL_FILE"
+    echo "✅ 新的全局基准已保存: $FINAL_FILE"
+
     # 清理临时文件
-    rm "$SRC_FILE"
+    rm "$DEST_FILE"
     rm -rf "$SPLIT_DIR"
 else
     echo "❌ 筛选失败，未找到结果文件"

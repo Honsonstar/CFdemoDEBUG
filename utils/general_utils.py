@@ -217,9 +217,9 @@ def _create_results_dir(args):
         - None
 
     """
-    # 【修复】避免重复添加 ./results/ 前缀
-    # 如果args.results_dir已经是 ./results 开头，则不重复添加
-    if not args.results_dir.startswith('./results'):
+    # 【修复】如果args.results_dir已经是绝对路径或./results开头，则不重复添加
+    # 确保只使用单层路径 results/ablation/...
+    if not args.results_dir.startswith('./results') and not args.results_dir.startswith('results/'):
         args.results_dir = os.path.join("./results", args.results_dir)
 
     if not os.path.isdir(args.results_dir):
