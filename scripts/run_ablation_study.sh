@@ -13,11 +13,30 @@ if [ -z "$1" ]; then
 fi
 
 STUDY=$1
+TODAY=$(date +%Y-%m-%d)
+
+# 【新增】创建日志和报告目录
+LOG_DIR="log/${TODAY}/${STUDY}"
+REPORT_DIR="report"
+mkdir -p "${LOG_DIR}" "${REPORT_DIR}"
+
+# 配置日志文件
+MAIN_LOG="${LOG_DIR}/ablation_study.log"
+
 echo "🚀 开始多模态消融实验: ${STUDY}"
+echo "📁 日志目录: ${LOG_DIR}"
+echo "📁 结果将保存到: report/"
 echo "=============================================="
+echo "" | tee -a "${MAIN_LOG}"
+echo "==============================================" | tee -a "${MAIN_LOG}"
+echo "🚀 开始多模态消融实验: ${STUDY}" | tee -a "${MAIN_LOG}"
+echo "📁 日志目录: ${LOG_DIR}" | tee -a "${MAIN_LOG}"
+echo "==============================================" | tee -a "${MAIN_LOG}"
 
 # 创建结果根目录
 ABLRESULTS_DIR="results/ablation/${STUDY}"
+export ABLRESULTS_DIR  # 导出变量供Python子进程使用
+export STUDY           # 导出STUDY变量
 mkdir -p "${ABLRESULTS_DIR}"/{gene,text,fusion}
 
 # 设置公共参数
@@ -29,6 +48,28 @@ EPOCHS=20
 LR=0.00005
 MAX_JOBS=4  # 最大并行任务数
 
+# 【新增】检查特征文件是否存在
+check_features() {
+    local study=$1
+    local all_exist=true
+    echo "🔍 检查 ${study^^} 的 CPCG 特征文件..."
+    for fold in $(seq 0 $((K_FOLDS-1))); do
+        local file="features/${study}/fold_${fold}_genes.csv"
+        if [ -f "$file" ]; then
+            echo "   ✓ Fold ${fold}: $(basename $file) 存在"
+        else
+            echo "   ✗ Fold ${fold}: $(basename $file) 缺失!"
+            all_exist=false
+        fi
+    done
+    if [ "$all_exist" = false ]; then
+        echo "❌ 错误: ${study} 特征文件不完整，跳过训练"
+        return 1
+    fi
+    echo "✅ ${study} 特征文件检查通过"
+    return 0
+}
+
 # 检查必要文件
 if [ ! -d "${SPLIT_DIR}" ]; then
     echo "❌ 错误: 找不到划分文件目录 ${SPLIT_DIR}"
@@ -38,6 +79,12 @@ fi
 
 if [ ! -f "${LABEL_FILE}" ]; then
     echo "❌ 错误: 找不到标签文件 ${LABEL_FILE}"
+    exit 1
+fi
+
+# 【新增】先检查特征文件
+if ! check_features "${STUDY}"; then
+    echo "⚠️  跳过 ${STUDY} 的消融实验"
     exit 1
 fi
 
@@ -136,37 +183,59 @@ GENE_SUMMARY="${ABLRESULTS_DIR}/gene/summary.csv"
 # 【加固】先等待所有后台任务完成（确保并行模式下文件已写入）
 wait
 
+# 【修复】使用 os.environ 获取环境变量，不再依赖Shell变量展开
 python3 << 'EOF_SUMMARY' | tee -a "${GENE_LOG}"
 import pandas as pd
 import glob
 import os
-import re
+import sys
 
-results_dir = "${ABLRESULTS_DIR}/gene"
+# 【修复】从环境变量获取路径
+results_dir = os.environ.get('ABLRESULTS_DIR', '') + '/gene'
 print(f"📁 搜索结果目录: {results_dir}")
+
+# 检查目录是否存在
+if not os.path.exists(results_dir):
+    print(f"❌ 错误: 目录不存在 {results_dir}")
+    sys.exit(1)
 
 dfs = []
 missing_folds = []
 
-# 遍历所有 fold 目录
-for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*")):
-    fold_name = os.path.basename(fold_dir)
-    fold_num = int(fold_name.split('_')[-1])
-
-    # 【加固】优先查找 summary_partial_*.csv，再找 summary.csv
-    summary_file = None
-    partial_files = glob.glob(f"{fold_dir}/summary_partial_*.csv")
-    if partial_files:
-        # 取最新的 partial 文件（如果有多个）
-        summary_file = max(partial_files, key=os.path.getmtime)
-        print(f"  ✓ Fold {fold_num}: 使用 {os.path.basename(summary_file)}")
-    elif os.path.exists(f"{fold_dir}/summary.csv"):
-        summary_file = f"{fold_dir}/summary.csv"
-        print(f"  ✓ Fold {fold_num}: 使用 summary.csv")
-    else:
-        print(f"  ✗ Fold {fold_num}: 文件缺失")
-        missing_folds.append(fold_num)
+# 【修复】递归查找所有子目录下的summary文件
+# main.py会在fold_X目录下创建更深的子文件夹
+for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
+    # 只处理目录
+    if not os.path.isdir(fold_dir):
         continue
+
+    fold_name = os.path.basename(fold_dir)
+    # 提取fold编号
+    try:
+        fold_num = int(fold_name.split('_')[-1])
+    except (ValueError, IndexError):
+        continue
+
+    print(f"  📂 检查 Fold {fold_num} 目录: {fold_dir}")
+
+    # 【修复】递归查找summary文件
+    summary_file = None
+    partial_files = glob.glob(f"{fold_dir}/**/summary_partial_*.csv", recursive=True)
+
+    if partial_files:
+        # 取最新的partial文件
+        summary_file = max(partial_files, key=os.path.getmtime)
+        print(f"     ✓ Fold {fold_num}: 使用 {os.path.basename(summary_file)}")
+    else:
+        # 尝试根目录的summary.csv
+        root_summary = f"{fold_dir}/summary.csv"
+        if os.path.exists(root_summary):
+            summary_file = root_summary
+            print(f"     ✓ Fold {fold_num}: 使用 summary.csv")
+        else:
+            print(f"     ✗ Fold {fold_num}: 文件缺失")
+            missing_folds.append(fold_num)
+            continue
 
     # 读取文件
     try:
@@ -174,7 +243,7 @@ for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*")):
         df['fold'] = fold_num
         dfs.append(df)
     except Exception as e:
-        print(f"  ✗ Fold {fold_num}: 读取失败 - {e}")
+        print(f"     ✗ Fold {fold_num}: 读取失败 - {e}")
         missing_folds.append(fold_num)
 
 if missing_folds:
@@ -212,40 +281,52 @@ python3 << 'EOF_SUMMARY' | tee -a "${TEXT_LOG}"
 import pandas as pd
 import glob
 import os
-import re
+import sys
 
-results_dir = "${ABLRESULTS_DIR}/text"
+results_dir = os.environ.get('ABLRESULTS_DIR', '') + '/text'
 print(f"📁 搜索结果目录: {results_dir}")
+
+if not os.path.exists(results_dir):
+    print(f"❌ 错误: 目录不存在 {results_dir}")
+    sys.exit(1)
 
 dfs = []
 missing_folds = []
 
-# 遍历所有 fold 目录
-for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*")):
-    fold_name = os.path.basename(fold_dir)
-    fold_num = int(fold_name.split('_')[-1])
-
-    # 【加固】优先查找 summary_partial_*.csv，再找 summary.csv
-    summary_file = None
-    partial_files = glob.glob(f"{fold_dir}/summary_partial_*.csv")
-    if partial_files:
-        summary_file = max(partial_files, key=os.path.getmtime)
-        print(f"  ✓ Fold {fold_num}: 使用 {os.path.basename(summary_file)}")
-    elif os.path.exists(f"{fold_dir}/summary.csv"):
-        summary_file = f"{fold_dir}/summary.csv"
-        print(f"  ✓ Fold {fold_num}: 使用 summary.csv")
-    else:
-        print(f"  ✗ Fold {fold_num}: 文件缺失")
-        missing_folds.append(fold_num)
+for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
+    if not os.path.isdir(fold_dir):
         continue
 
-    # 读取文件
+    fold_name = os.path.basename(fold_dir)
+    try:
+        fold_num = int(fold_name.split('_')[-1])
+    except (ValueError, IndexError):
+        continue
+
+    print(f"  📂 检查 Fold {fold_num} 目录: {fold_dir}")
+
+    summary_file = None
+    partial_files = glob.glob(f"{fold_dir}/**/summary_partial_*.csv", recursive=True)
+
+    if partial_files:
+        summary_file = max(partial_files, key=os.path.getmtime)
+        print(f"     ✓ Fold {fold_num}: 使用 {os.path.basename(summary_file)}")
+    else:
+        root_summary = f"{fold_dir}/summary.csv"
+        if os.path.exists(root_summary):
+            summary_file = root_summary
+            print(f"     ✓ Fold {fold_num}: 使用 summary.csv")
+        else:
+            print(f"     ✗ Fold {fold_num}: 文件缺失")
+            missing_folds.append(fold_num)
+            continue
+
     try:
         df = pd.read_csv(summary_file)
         df['fold'] = fold_num
         dfs.append(df)
     except Exception as e:
-        print(f"  ✗ Fold {fold_num}: 读取失败 - {e}")
+        print(f"     ✗ Fold {fold_num}: 读取失败 - {e}")
         missing_folds.append(fold_num)
 
 if missing_folds:
@@ -282,40 +363,52 @@ python3 << 'EOF_SUMMARY' | tee -a "${FUSION_LOG}"
 import pandas as pd
 import glob
 import os
-import re
+import sys
 
-results_dir = "${ABLRESULTS_DIR}/fusion"
+results_dir = os.environ.get('ABLRESULTS_DIR', '') + '/fusion'
 print(f"📁 搜索结果目录: {results_dir}")
+
+if not os.path.exists(results_dir):
+    print(f"❌ 错误: 目录不存在 {results_dir}")
+    sys.exit(1)
 
 dfs = []
 missing_folds = []
 
-# 遍历所有 fold 目录
-for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*")):
-    fold_name = os.path.basename(fold_dir)
-    fold_num = int(fold_name.split('_')[-1])
-
-    # 【加固】优先查找 summary_partial_*.csv，再找 summary.csv
-    summary_file = None
-    partial_files = glob.glob(f"{fold_dir}/summary_partial_*.csv")
-    if partial_files:
-        summary_file = max(partial_files, key=os.path.getmtime)
-        print(f"  ✓ Fold {fold_num}: 使用 {os.path.basename(summary_file)}")
-    elif os.path.exists(f"{fold_dir}/summary.csv"):
-        summary_file = f"{fold_dir}/summary.csv"
-        print(f"  ✓ Fold {fold_num}: 使用 summary.csv")
-    else:
-        print(f"  ✗ Fold {fold_num}: 文件缺失")
-        missing_folds.append(fold_num)
+for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
+    if not os.path.isdir(fold_dir):
         continue
 
-    # 读取文件
+    fold_name = os.path.basename(fold_dir)
+    try:
+        fold_num = int(fold_name.split('_')[-1])
+    except (ValueError, IndexError):
+        continue
+
+    print(f"  📂 检查 Fold {fold_num} 目录: {fold_dir}")
+
+    summary_file = None
+    partial_files = glob.glob(f"{fold_dir}/**/summary_partial_*.csv", recursive=True)
+
+    if partial_files:
+        summary_file = max(partial_files, key=os.path.getmtime)
+        print(f"     ✓ Fold {fold_num}: 使用 {os.path.basename(summary_file)}")
+    else:
+        root_summary = f"{fold_dir}/summary.csv"
+        if os.path.exists(root_summary):
+            summary_file = root_summary
+            print(f"     ✓ Fold {fold_num}: 使用 summary.csv")
+        else:
+            print(f"     ✗ Fold {fold_num}: 文件缺失")
+            missing_folds.append(fold_num)
+            continue
+
     try:
         df = pd.read_csv(summary_file)
         df['fold'] = fold_num
         dfs.append(df)
     except Exception as e:
-        print(f"  ✗ Fold {fold_num}: 读取失败 - {e}")
+        print(f"     ✗ Fold {fold_num}: 读取失败 - {e}")
         missing_folds.append(fold_num)
 
 if missing_folds:
@@ -343,8 +436,9 @@ echo "📈 生成最终对比表格"
 echo "=============================================="
 
 FINAL_CSV="${ABLRESULTS_DIR}/final_comparison.csv"
+REPORT_CSV="report/${TODAY}_${STUDY}_ablation_comparison.csv"
 
-# 【加固】等待所有后台任务完成（理论上应该已经完成了，但以防万一）
+# 【加固】等待所有后台任务完成
 wait
 
 python3 << 'EOF_FINAL' | tee -a "${ABLRESULTS_DIR}/ablation_summary.log"
@@ -467,5 +561,12 @@ echo "✅ 消融实验完成！"
 echo "=============================================="
 echo "📁 结果目录: ${ABLRESULTS_DIR}"
 echo "📊 对比表格: ${FINAL_CSV}"
+echo "📋 报告文件: ${REPORT_CSV}"
 echo "⚡ 并行任务数: ${MAX_JOBS}"
 echo "=============================================="
+
+# 【新增】复制最终结果到 report 目录
+if [ -f "${FINAL_CSV}" ]; then
+    cp "${FINAL_CSV}" "${REPORT_CSV}"
+    echo "📁 已复制结果到: ${REPORT_CSV}"
+fi

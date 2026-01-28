@@ -1,0 +1,28 @@
+nohup: ignoring input
+========================================================
+🚀 [Start] Wed 28 Jan 2026 11:35:07 AM CST 正在启动: coadread (Gene vs Text vs Fusion)
+========================================================
+🚀 开始多模态消融实验: coadread
+📁 日志目录: log/2026-01-28/coadread
+📁 结果将保存到: report/
+==============================================
+
+==============================================
+🚀 开始多模态消融实验: coadread
+📁 日志目录: log/2026-01-28/coadread
+==============================================
+🔍 检查 COADREAD 的 CPCG 特征文件...
+   ✓ Fold 0: fold_0_genes.csv 存在
+   ✓ Fold 1: fold_1_genes.csv 存在
+   ✓ Fold 2: fold_2_genes.csv 存在
+   ✓ Fold 3: fold_3_genes.csv 存在
+   ✓ Fold 4: fold_4_genes.csv 存在
+✅ coadread 特征文件检查通过
+==============================================
+🧬 Gene Only (仅基因)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation/coadread/gene/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation/coadread/gene/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation/coadread/gene/fold_2/training.log)
+  └─ 启动 Fold 3... (日志: results/ablation/coadread/gene/fold_3/training.log)
+  └─ 达到最大并发数 4，等待任务完成...
