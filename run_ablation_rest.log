@@ -26,3 +26,320 @@ nohup: ignoring input
   └─ 启动 Fold 2... (日志: results/ablation/coadread/gene/fold_2/training.log)
   └─ 启动 Fold 3... (日志: results/ablation/coadread/gene/fold_3/training.log)
   └─ 达到最大并发数 4，等待任务完成...
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 4... (日志: results/ablation/coadread/gene/fold_4/training.log)
+  └─ 等待剩余 1 个任务完成...
+  └─ Gene Only (仅基因) 所有 Fold 完成
+
+📊 汇总 Gene Only 结果...
+📁 搜索结果目录: results/ablation/coadread/gene
+  📂 检查 Fold 0 目录: results/ablation/coadread/gene/fold_0
+     ✗ Fold 0: 文件缺失
+  📂 检查 Fold 1 目录: results/ablation/coadread/gene/fold_1
+     ✗ Fold 1: 文件缺失
+  📂 检查 Fold 2 目录: results/ablation/coadread/gene/fold_2
+     ✗ Fold 2: 文件缺失
+  📂 检查 Fold 3 目录: results/ablation/coadread/gene/fold_3
+     ✗ Fold 3: 文件缺失
+  📂 检查 Fold 4 目录: results/ablation/coadread/gene/fold_4
+     ✗ Fold 4: 文件缺失
+⚠️  缺失折数: [0, 1, 2, 3, 4]
+❌ 错误: 没有任何折的结果文件可用
+  └─ 汇总完成: results/ablation/coadread/gene/summary.csv
+==============================================
+🧬 Text Only (仅文本)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation/coadread/text/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation/coadread/text/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation/coadread/text/fold_2/training.log)
+  └─ 启动 Fold 3... (日志: results/ablation/coadread/text/fold_3/training.log)
+  └─ 达到最大并发数 4，等待任务完成...
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 4... (日志: results/ablation/coadread/text/fold_4/training.log)
+  └─ 等待剩余 1 个任务完成...
+scripts/run_ablation_study.sh: line 166: 807615 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ Text Only (仅文本) 所有 Fold 完成
+
+📊 汇总 Text Only 结果...
+📁 搜索结果目录: results/ablation/coadread/text
+  📂 检查 Fold 0 目录: results/ablation/coadread/text/fold_0
+     ✗ Fold 0: 文件缺失
+  📂 检查 Fold 1 目录: results/ablation/coadread/text/fold_1
+     ✗ Fold 1: 文件缺失
+  📂 检查 Fold 2 目录: results/ablation/coadread/text/fold_2
+     ✗ Fold 2: 文件缺失
+  📂 检查 Fold 3 目录: results/ablation/coadread/text/fold_3
+     ✗ Fold 3: 文件缺失
+  📂 检查 Fold 4 目录: results/ablation/coadread/text/fold_4
+     ✗ Fold 4: 文件缺失
+⚠️  缺失折数: [0, 1, 2, 3, 4]
+❌ 错误: 没有任何折的结果文件可用
+  └─ 汇总完成: results/ablation/coadread/text/summary.csv
+==============================================
+🧬 Fusion (多模态融合)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation/coadread/fusion/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation/coadread/fusion/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation/coadread/fusion/fold_2/training.log)
+  └─ 启动 Fold 3... (日志: results/ablation/coadread/fusion/fold_3/training.log)
+  └─ 达到最大并发数 4，等待任务完成...
+scripts/run_ablation_study.sh: line 157: 807776 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 807784 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 807780 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 807788 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 4... (日志: results/ablation/coadread/fusion/fold_4/training.log)
+  └─ 等待剩余 1 个任务完成...
+scripts/run_ablation_study.sh: line 166: 807883 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ Fusion (多模态融合) 所有 Fold 完成
+
+📊 汇总 Fusion 结果...
+📁 搜索结果目录: results/ablation/coadread/fusion
+  📂 检查 Fold 0 目录: results/ablation/coadread/fusion/fold_0
+     ✗ Fold 0: 文件缺失
+  📂 检查 Fold 1 目录: results/ablation/coadread/fusion/fold_1
+     ✗ Fold 1: 文件缺失
+  📂 检查 Fold 2 目录: results/ablation/coadread/fusion/fold_2
+     ✗ Fold 2: 文件缺失
+  📂 检查 Fold 3 目录: results/ablation/coadread/fusion/fold_3
+     ✗ Fold 3: 文件缺失
+  📂 检查 Fold 4 目录: results/ablation/coadread/fusion/fold_4
+     ✗ Fold 4: 文件缺失
+⚠️  缺失折数: [0, 1, 2, 3, 4]
+❌ 错误: 没有任何折的结果文件可用
+  └─ 汇总完成: results/ablation/coadread/fusion/summary.csv
+
+==============================================
+📈 生成最终对比表格
+==============================================
+📊 读取各模式汇总结果...
+  ⚠️  Gene Only: results/ablation/${STUDY}/gene/summary.csv 不存在
+  ⚠️  Text Only: results/ablation/${STUDY}/text/summary.csv 不存在
+  ⚠️  Fusion: results/ablation/${STUDY}/fusion/summary.csv 不存在
+
+📊 构建对比表格 (共 0 折)...
+Traceback (most recent call last):
+  File "<stdin>", line 88, in <module>
+  File "/root/miniconda3/envs/causal/lib/python3.8/site-packages/pandas/core/frame.py", line 3761, in __getitem__
+    indexer = self.columns.get_loc(key)
+  File "/root/miniconda3/envs/causal/lib/python3.8/site-packages/pandas/core/indexes/range.py", line 349, in get_loc
+    raise KeyError(key)
+KeyError: 'Gene_C_Index'
+
+✅ 消融实验完成！
+==============================================
+📁 结果目录: results/ablation/coadread
+📊 对比表格: results/ablation/coadread/final_comparison.csv
+📋 报告文件: report/2026-01-28_coadread_ablation_comparison.csv
+⚡ 并行任务数: 4
+==============================================
+✅ [End] Wed 28 Jan 2026 12:36:24 PM CST coadread 完成！
+--------------------------------------------------------
+
+========================================================
+🚀 [Start] Wed 28 Jan 2026 12:36:24 PM CST 正在启动: hnsc (Gene vs Text vs Fusion)
+========================================================
+🚀 开始多模态消融实验: hnsc
+📁 日志目录: log/2026-01-28/hnsc
+📁 结果将保存到: report/
+==============================================
+
+==============================================
+🚀 开始多模态消融实验: hnsc
+📁 日志目录: log/2026-01-28/hnsc
+==============================================
+🔍 检查 HNSC 的 CPCG 特征文件...
+   ✓ Fold 0: fold_0_genes.csv 存在
+   ✓ Fold 1: fold_1_genes.csv 存在
+   ✓ Fold 2: fold_2_genes.csv 存在
+   ✓ Fold 3: fold_3_genes.csv 存在
+   ✓ Fold 4: fold_4_genes.csv 存在
+✅ hnsc 特征文件检查通过
+==============================================
+🧬 Gene Only (仅基因)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation/hnsc/gene/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation/hnsc/gene/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation/hnsc/gene/fold_2/training.log)
+  └─ 启动 Fold 3... (日志: results/ablation/hnsc/gene/fold_3/training.log)
+  └─ 达到最大并发数 4，等待任务完成...
+scripts/run_ablation_study.sh: line 157: 808104 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 808112 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 808108 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 808116 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 4... (日志: results/ablation/hnsc/gene/fold_4/training.log)
+  └─ 等待剩余 1 个任务完成...
+scripts/run_ablation_study.sh: line 166: 808360 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ Gene Only (仅基因) 所有 Fold 完成
+
+📊 汇总 Gene Only 结果...
+📁 搜索结果目录: results/ablation/hnsc/gene
+  📂 检查 Fold 0 目录: results/ablation/hnsc/gene/fold_0
+     ✗ Fold 0: 文件缺失
+  📂 检查 Fold 1 目录: results/ablation/hnsc/gene/fold_1
+     ✗ Fold 1: 文件缺失
+  📂 检查 Fold 2 目录: results/ablation/hnsc/gene/fold_2
+     ✗ Fold 2: 文件缺失
+  📂 检查 Fold 3 目录: results/ablation/hnsc/gene/fold_3
+     ✗ Fold 3: 文件缺失
+  📂 检查 Fold 4 目录: results/ablation/hnsc/gene/fold_4
+     ✗ Fold 4: 文件缺失
+⚠️  缺失折数: [0, 1, 2, 3, 4]
+❌ 错误: 没有任何折的结果文件可用
+  └─ 汇总完成: results/ablation/hnsc/gene/summary.csv
+==============================================
+🧬 Text Only (仅文本)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation/hnsc/text/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation/hnsc/text/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation/hnsc/text/fold_2/training.log)
+  └─ 启动 Fold 3... (日志: results/ablation/hnsc/text/fold_3/training.log)
+  └─ 达到最大并发数 4，等待任务完成...
+scripts/run_ablation_study.sh: line 157: 809724 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 809728 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 809732 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 809736 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 4... (日志: results/ablation/hnsc/text/fold_4/training.log)
+  └─ 等待剩余 1 个任务完成...
+scripts/run_ablation_study.sh: line 166: 810385 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ Text Only (仅文本) 所有 Fold 完成
+
+📊 汇总 Text Only 结果...
+📁 搜索结果目录: results/ablation/hnsc/text
+  📂 检查 Fold 0 目录: results/ablation/hnsc/text/fold_0
+     ✗ Fold 0: 文件缺失
+  📂 检查 Fold 1 目录: results/ablation/hnsc/text/fold_1
+     ✗ Fold 1: 文件缺失
+  📂 检查 Fold 2 目录: results/ablation/hnsc/text/fold_2
+     ✗ Fold 2: 文件缺失
+  📂 检查 Fold 3 目录: results/ablation/hnsc/text/fold_3
+     ✗ Fold 3: 文件缺失
+  📂 检查 Fold 4 目录: results/ablation/hnsc/text/fold_4
+     ✗ Fold 4: 文件缺失
+⚠️  缺失折数: [0, 1, 2, 3, 4]
+❌ 错误: 没有任何折的结果文件可用
+  └─ 汇总完成: results/ablation/hnsc/text/summary.csv
+==============================================
+🧬 Fusion (多模态融合)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation/hnsc/fusion/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation/hnsc/fusion/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation/hnsc/fusion/fold_2/training.log)
+  └─ 启动 Fold 3... (日志: results/ablation/hnsc/fusion/fold_3/training.log)
+  └─ 达到最大并发数 4，等待任务完成...
+scripts/run_ablation_study.sh: line 157: 810540 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 810544 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 810548 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 810552 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 4... (日志: results/ablation/hnsc/fusion/fold_4/training.log)
+  └─ 等待剩余 1 个任务完成...
+scripts/run_ablation_study.sh: line 166: 810780 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ Fusion (多模态融合) 所有 Fold 完成
+
+📊 汇总 Fusion 结果...
+📁 搜索结果目录: results/ablation/hnsc/fusion
+  📂 检查 Fold 0 目录: results/ablation/hnsc/fusion/fold_0
+     ✗ Fold 0: 文件缺失
+  📂 检查 Fold 1 目录: results/ablation/hnsc/fusion/fold_1
+     ✗ Fold 1: 文件缺失
+  📂 检查 Fold 2 目录: results/ablation/hnsc/fusion/fold_2
+     ✗ Fold 2: 文件缺失
+  📂 检查 Fold 3 目录: results/ablation/hnsc/fusion/fold_3
+     ✗ Fold 3: 文件缺失
+  📂 检查 Fold 4 目录: results/ablation/hnsc/fusion/fold_4
+     ✗ Fold 4: 文件缺失
+⚠️  缺失折数: [0, 1, 2, 3, 4]
+❌ 错误: 没有任何折的结果文件可用
+  └─ 汇总完成: results/ablation/hnsc/fusion/summary.csv
+
+==============================================
+📈 生成最终对比表格
+==============================================
+📊 读取各模式汇总结果...
+  ✓ Gene Only: 成功读取 0 条记录
+  ✓ Text Only: 成功读取 0 条记录
+  ✓ Fusion: 成功读取 0 条记录
+
+📊 构建对比表格 (共 0 折)...
+Traceback (most recent call last):
+  File "<stdin>", line 89, in <module>
+  File "/root/miniconda3/envs/causal/lib/python3.8/site-packages/pandas/core/frame.py", line 3761, in __getitem__
+    indexer = self.columns.get_loc(key)
+  File "/root/miniconda3/envs/causal/lib/python3.8/site-packages/pandas/core/indexes/range.py", line 349, in get_loc
+    raise KeyError(key)
+KeyError: 'Gene_C_Index'
+
+✅ 消融实验完成！
+==============================================
+📁 结果目录: results/ablation/hnsc
+📊 对比表格: results/ablation/hnsc/final_comparison.csv
+📋 报告文件: report/2026-01-28_hnsc_ablation_comparison.csv
+⚡ 并行任务数: 4
+==============================================
+📁 已复制结果到: report/2026-01-28_hnsc_ablation_comparison.csv
+✅ [End] Wed 28 Jan 2026 12:37:35 PM CST hnsc 完成！
+--------------------------------------------------------
+
+========================================================
+🚀 [Start] Wed 28 Jan 2026 12:37:35 PM CST 正在启动: stad (Gene vs Text vs Fusion)
+========================================================
+🚀 开始多模态消融实验: stad
+📁 日志目录: log/2026-01-28/stad
+📁 结果将保存到: report/
+==============================================
+
+==============================================
+🚀 开始多模态消融实验: stad
+📁 日志目录: log/2026-01-28/stad
+==============================================
+🔍 检查 STAD 的 CPCG 特征文件...
+   ✓ Fold 0: fold_0_genes.csv 存在
+   ✓ Fold 1: fold_1_genes.csv 存在
+   ✓ Fold 2: fold_2_genes.csv 存在
+   ✓ Fold 3: fold_3_genes.csv 存在
+   ✓ Fold 4: fold_4_genes.csv 存在
+✅ stad 特征文件检查通过
+==============================================
+🧬 Gene Only (仅基因)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation/stad/gene/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation/stad/gene/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation/stad/gene/fold_2/training.log)
+  └─ 启动 Fold 3... (日志: results/ablation/stad/gene/fold_3/training.log)
+  └─ 达到最大并发数 4，等待任务完成...
+scripts/run_ablation_study.sh: line 157: 811001 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 811005 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 811009 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+scripts/run_ablation_study.sh: line 157: 811013 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 4... (日志: results/ablation/stad/gene/fold_4/training.log)
+  └─ 等待剩余 1 个任务完成...
+scripts/run_ablation_study.sh: line 166: 811271 Killed                  python3 main.py --study tcga_${STUDY} --k_start ${fold} --k_end $((fold + 1)) --split_dir "${SPLIT_DIR}" --results_dir "${RESULTS_DIR}" --seed ${SEED} --label_file "${LABEL_FILE}" --task survival --n_classes 4 --modality snn --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" --data_root_dir "data/${STUDY}/pt_files" --label_col survival_months --type_of_path combine --max_epochs ${EPOCHS} --lr ${LR} --opt adam --reg 0.00001 --alpha_surv 0.5 --weighted_sample --batch_size 1 --bag_loss nll_surv --encoding_dim 256 --num_patches 4096 --wsi_projection_dim 256 --encoding_layer_1_dim 8 --encoding_layer_2_dim 16 --encoder_dropout 0.25 --ab_model ${ab_model} > "${fold_log}" 2>&1
+  └─ Gene Only (仅基因) 所有 Fold 完成
+
+📊 汇总 Gene Only 结果...
+📁 搜索结果目录: results/ablation/stad/gene
+  📂 检查 Fold 0 目录: results/ablation/stad/gene/fold_0
+     ✗ Fold 0: 文件缺失
+  📂 检查 Fold 1 目录: results/ablation/stad/gene/fold_1
+     ✗ Fold 1: 文件缺失
+  📂 检查 Fold 2 目录: results/ablation/stad/gene/fold_2
+     ✗ Fold 2: 文件缺失
+  📂 检查 Fold 3 目录: results/ablation/stad/gene/fold_3
+     ✗ Fold 3: 文件缺失
+  📂 检查 Fold 4 目录: results/ablation/stad/gene/fold_4
+     ✗ Fold 4: 文件缺失
+⚠️  缺失折数: [0, 1, 2, 3, 4]
+❌ 错误: 没有任何折的结果文件可用
+  └─ 汇总完成: results/ablation/stad/gene/summary.csv
+==============================================
+🧬 Text Only (仅文本)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation/stad/text/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation/stad/text/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation/stad/text/fold_2/training.log)
+  └─ 启动 Fold 3... (日志: results/ablation/stad/text/fold_3/training.log)
+  └─ 达到最大并发数 4，等待任务完成...

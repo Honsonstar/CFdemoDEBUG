@@ -15,9 +15,53 @@ fi
 STUDY=$1
 TODAY=$(date +%Y-%m-%d)
 
-# 【新增】创建日志和报告目录
+# ==================== 数据路径配置 ====================
+# 【重要】所有数据路径统一在此处配置，请勿在代码中硬编码路径
+# 注意：必须放在 STUDY=$1 之后，确保变量已定义
+
+# 1. 训练数据路径
+# ----------------
+# 临床标签文件: 包含患者生存信息、文本报告等
+LABEL_FILE="datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv"
+
+# 交叉验证划分文件: 5折嵌套交叉验证的划分
+SPLIT_DIR="splits/nested_cv/${STUDY}"
+
+# CPCG基因特征文件: CPCG筛选的各折基因特征（嵌套CV需要各折独立特征）
+# 路径格式: features/${STUDY}/fold_${fold}_genes.csv
+FEATURE_DIR="features/${STUDY}"
+
+# RNA原始数据: 用于加载完整的RNA表达数据（备选）
+OMICS_DIR="datasets_csv/raw_rna_data/combine/${STUDY}"
+
+# PT数据文件: WSI图像的预提取特征
+DATA_ROOT_DIR="data/${STUDY}/pt_files"
+
+# 2. 模型与输出路径
+# ----------------
+# BioBERT预训练模型: 文本编码器（预训练，无需下载）
+BIOBERT_DIR="biobert"
+
+# 消融实验结果目录: 保存训练结果
+# 优先使用双层路径（已存在历史结果），否则创建单层路径
+ABLRESULTS_DIR="results/ablation/${STUDY}"
+
+# 日志目录
 LOG_DIR="log/${TODAY}/${STUDY}"
+
+# 报告目录
 REPORT_DIR="report"
+
+# 3. 训练超参数
+# ----------------
+SEED=42                    # 随机种子（保证可复现性）
+K_FOLDS=5                  # 交叉验证折数
+EPOCHS=20                  # 训练轮数
+LR=0.00005                 # 学习率
+MAX_JOBS=2                 # 最大并行任务数（避免GPU内存不足）
+# =========================================================
+
+# 创建日志和报告目录
 mkdir -p "${LOG_DIR}" "${REPORT_DIR}"
 
 # 配置日志文件
@@ -33,20 +77,20 @@ echo "🚀 开始多模态消融实验: ${STUDY}" | tee -a "${MAIN_LOG}"
 echo "📁 日志目录: ${LOG_DIR}" | tee -a "${MAIN_LOG}"
 echo "==============================================" | tee -a "${MAIN_LOG}"
 
-# 创建结果根目录
+# 【修复】强制使用单层路径，避免嵌套
+# 结果目录: results/ablation/{cancer}/{mode}/fold_{X}
 ABLRESULTS_DIR="results/ablation/${STUDY}"
 export ABLRESULTS_DIR  # 导出变量供Python子进程使用
-export STUDY           # 导出STUDY变量
+
+# 创建结果目录结构
 mkdir -p "${ABLRESULTS_DIR}"/{gene,text,fusion}
 
-# 设置公共参数
-SPLIT_DIR="splits/nested_cv/${STUDY}"
-LABEL_FILE="datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv"
-SEED=42
-K_FOLDS=5
-EPOCHS=20
-LR=0.00005
-MAX_JOBS=4  # 最大并行任务数
+echo "📁 结果目录: ${ABLRESULTS_DIR}"
+
+export STUDY           # 导出STUDY变量
+export LABEL_FILE      # 导出标签文件路径（供Python使用）
+export SPLIT_DIR       # 导出划分文件路径（供Python使用）
+export ABLRESULTS_DIR  # 导出结果目录路径（供Python使用）
 
 # 【新增】检查特征文件是否存在
 check_features() {
@@ -54,7 +98,7 @@ check_features() {
     local all_exist=true
     echo "🔍 检查 ${study^^} 的 CPCG 特征文件..."
     for fold in $(seq 0 $((K_FOLDS-1))); do
-        local file="features/${study}/fold_${fold}_genes.csv"
+        local file="${FEATURE_DIR}/fold_${fold}_genes.csv"
         if [ -f "$file" ]; then
             echo "   ✓ Fold ${fold}: $(basename $file) 存在"
         else
@@ -125,8 +169,8 @@ run_ablation_mode() {
             --task survival \
             --n_classes 4 \
             --modality snn \
-            --omics_dir "datasets_csv/raw_rna_data/combine/${STUDY}" \
-            --data_root_dir "data/${STUDY}/pt_files" \
+            --omics_dir "${OMICS_DIR}" \
+            --data_root_dir "${DATA_ROOT_DIR}" \
             --label_col survival_months \
             --type_of_path combine \
             --max_epochs ${EPOCHS} \
@@ -179,6 +223,7 @@ run_ablation_mode "Gene Only (仅基因)" 2 "gene" "${GENE_LOG}"
 echo "" | tee -a "${GENE_LOG}"
 echo "📊 汇总 Gene Only 结果..." | tee -a "${GENE_LOG}"
 GENE_SUMMARY="${ABLRESULTS_DIR}/gene/summary.csv"
+export GENE_SUMMARY
 
 # 【加固】先等待所有后台任务完成（确保并行模式下文件已写入）
 wait
@@ -192,6 +237,7 @@ import sys
 
 # 【修复】从环境变量获取路径
 results_dir = os.environ.get('ABLRESULTS_DIR', '') + '/gene'
+gene_summary_path = os.environ.get('GENE_SUMMARY', '')
 print(f"📁 搜索结果目录: {results_dir}")
 
 # 检查目录是否存在
@@ -251,14 +297,14 @@ if missing_folds:
 
 if dfs:
     result = pd.concat(dfs).sort_values('fold')
-    result.to_csv('${GENE_SUMMARY}', index=False)
+    result.to_csv(gene_summary_path, index=False)
     mean_cindex = result['val_cindex'].mean()
     print(f'✅ Gene Only 汇总完成: {len(dfs)}/{len(dfs) + len(missing_folds)} 折成功')
     print(f'   平均 C-Index: {mean_cindex:.4f}')
 else:
     print('❌ 错误: 没有任何折的结果文件可用')
     # 创建空文件避免后续错误
-    pd.DataFrame(columns=['folds', 'val_cindex']).to_csv('${GENE_SUMMARY}', index=False)
+    pd.DataFrame(columns=['folds', 'val_cindex']).to_csv(gene_summary_path, index=False)
 EOF_SUMMARY
 
 echo "  └─ 汇总完成: ${GENE_SUMMARY}" | tee -a "${GENE_LOG}"
@@ -273,6 +319,7 @@ run_ablation_mode "Text Only (仅文本)" 1 "text" "${TEXT_LOG}"
 echo "" | tee -a "${TEXT_LOG}"
 echo "📊 汇总 Text Only 结果..." | tee -a "${TEXT_LOG}"
 TEXT_SUMMARY="${ABLRESULTS_DIR}/text/summary.csv"
+export TEXT_SUMMARY
 
 # 【加固】先等待所有后台任务完成
 wait
@@ -284,6 +331,7 @@ import os
 import sys
 
 results_dir = os.environ.get('ABLRESULTS_DIR', '') + '/text'
+text_summary_path = os.environ.get('TEXT_SUMMARY', '')
 print(f"📁 搜索结果目录: {results_dir}")
 
 if not os.path.exists(results_dir):
@@ -334,13 +382,13 @@ if missing_folds:
 
 if dfs:
     result = pd.concat(dfs).sort_values('fold')
-    result.to_csv('${TEXT_SUMMARY}', index=False)
+    result.to_csv(text_summary_path, index=False)
     mean_cindex = result['val_cindex'].mean()
     print(f'✅ Text Only 汇总完成: {len(dfs)}/{len(dfs) + len(missing_folds)} 折成功')
     print(f'   平均 C-Index: {mean_cindex:.4f}')
 else:
     print('❌ 错误: 没有任何折的结果文件可用')
-    pd.DataFrame(columns=['folds', 'val_cindex']).to_csv('${TEXT_SUMMARY}', index=False)
+    pd.DataFrame(columns=['folds', 'val_cindex']).to_csv(text_summary_path, index=False)
 EOF_SUMMARY
 
 echo "  └─ 汇总完成: ${TEXT_SUMMARY}" | tee -a "${TEXT_LOG}"
@@ -355,6 +403,7 @@ run_ablation_mode "Fusion (多模态融合)" 3 "fusion" "${FUSION_LOG}"
 echo "" | tee -a "${FUSION_LOG}"
 echo "📊 汇总 Fusion 结果..." | tee -a "${FUSION_LOG}"
 FUSION_SUMMARY="${ABLRESULTS_DIR}/fusion/summary.csv"
+export FUSION_SUMMARY
 
 # 【加固】先等待所有后台任务完成
 wait
@@ -366,6 +415,7 @@ import os
 import sys
 
 results_dir = os.environ.get('ABLRESULTS_DIR', '') + '/fusion'
+fusion_summary_path = os.environ.get('FUSION_SUMMARY', '')
 print(f"📁 搜索结果目录: {results_dir}")
 
 if not os.path.exists(results_dir):
@@ -416,13 +466,13 @@ if missing_folds:
 
 if dfs:
     result = pd.concat(dfs).sort_values('fold')
-    result.to_csv('${FUSION_SUMMARY}', index=False)
+    result.to_csv(fusion_summary_path, index=False)
     mean_cindex = result['val_cindex'].mean()
     print(f'✅ Fusion 汇总完成: {len(dfs)}/{len(dfs) + len(missing_folds)} 折成功')
     print(f'   平均 C-Index: {mean_cindex:.4f}')
 else:
     print('❌ 错误: 没有任何折的结果文件可用')
-    pd.DataFrame(columns=['folds', 'val_cindex']).to_csv('${FUSION_SUMMARY}', index=False)
+    pd.DataFrame(columns=['folds', 'val_cindex']).to_csv(fusion_summary_path, index=False)
 EOF_SUMMARY
 
 echo "  └─ 汇总完成: ${FUSION_SUMMARY}" | tee -a "${FUSION_LOG}"
@@ -436,6 +486,7 @@ echo "📈 生成最终对比表格"
 echo "=============================================="
 
 FINAL_CSV="${ABLRESULTS_DIR}/final_comparison.csv"
+export FINAL_CSV
 REPORT_CSV="report/${TODAY}_${STUDY}_ablation_comparison.csv"
 
 # 【加固】等待所有后台任务完成
@@ -447,7 +498,7 @@ import numpy as np
 import glob
 import os
 
-study = "${STUDY}"
+study = os.environ.get('STUDY', '')
 ablation_dir = f"results/ablation/{study}"
 
 # 读取三个模式的汇总结果
@@ -526,7 +577,8 @@ for fold in all_folds:
     comparison_data.append(row)
 
 comparison_df = pd.DataFrame(comparison_data)
-comparison_df.to_csv("${FINAL_CSV}", index=False)
+final_csv_path = os.environ.get('FINAL_CSV', '')
+comparison_df.to_csv(final_csv_path, index=False)
 
 # 计算平均值（忽略 NaN）
 gene_mean = comparison_df['Gene_C_Index'].mean()

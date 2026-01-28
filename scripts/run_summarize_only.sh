@@ -1,7 +1,6 @@
 #!/bin/bash
 # ====================================================================
-# 只运行汇总步骤（不重新训练）- 鲁棒递归查找版
-# 支持任意嵌套深度的目录结构，包括双重 results/ 路径
+# 只运行汇总步骤（不重新训练）
 # ====================================================================
 
 if [ -z "$1" ]; then
@@ -12,21 +11,41 @@ fi
 
 STUDY=$1
 TODAY=$(date +%Y-%m-%d)
-ABLRESULTS_DIR="results/ablation/${STUDY}"
-export ABLRESULTS_DIR  # 导出变量
-export STUDY           # 导出变量
 
-# 【修复】检查是否存在双层路径
-if [ -d "results/results/ablation/${STUDY}" ]; then
-    echo "⚠️  检测到双层路径 results/results/ablation/"
-    ABLRESULTS_DIR="results/results/ablation/${STUDY}"
-    export ABLRESULTS_DIR
-    echo "📁 已切换到: ${ABLRESULTS_DIR}"
-fi
+# ==================== 数据路径配置 ====================
+# 【重要】所有数据路径统一在此处配置
+# 注意：必须放在 STUDY=$1 之后
+
+# 1. 结果路径
+# ----------------
+# 消融实验结果目录: 保存训练结果（强制使用单层路径）
+ABLRESULTS_DIR="results/ablation/${STUDY}"
+
+# 日志目录
+LOG_DIR="log/${TODAY}/${STUDY}"
+
+# 报告目录
+REPORT_DIR="report"
+
+# 2. 输出文件配置
+# ----------------
+# 各模式的汇总文件路径（根据癌症名称动态生成）
+GENE_SUMMARY="${ABLRESULTS_DIR}/gene/summary.csv"
+TEXT_SUMMARY="${ABLRESULTS_DIR}/text/summary.csv"
+FUSION_SUMMARY="${ABLRESULTS_DIR}/fusion/summary.csv"
+FINAL_CSV="${ABLRESULTS_DIR}/final_comparison.csv"
+REPORT_CSV="report/${TODAY}_${STUDY}_ablation_comparison.csv"
+# =========================================================
 
 # 创建报告目录
-REPORT_DIR="report"
 mkdir -p "${REPORT_DIR}"
+
+# 导出环境变量供Python使用
+export GENE_SUMMARY      # Gene模式汇总文件路径
+export TEXT_SUMMARY      # Text模式汇总文件路径
+export FUSION_SUMMARY    # Fusion模式汇总文件路径
+export FINAL_CSV         # 最终对比表格路径
+export REPORT_CSV        # 报告文件路径
 
 echo "🔄 只运行汇总步骤: ${STUDY}"
 echo "=============================================="
@@ -38,7 +57,7 @@ cd /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy
 
 # 汇总 Gene Only 结果
 echo "📊 汇总 Gene Only 结果..."
-GENE_SUMMARY="${ABLRESULTS_DIR}/gene/summary.csv"
+
 python3 << 'EOF_SUMMARY' | tee -a "${ABLRESULTS_DIR}/gene_summarize.log"
 import pandas as pd
 import glob
@@ -46,15 +65,15 @@ import os
 import sys
 import re
 
-# 获取环境变量
+# 【环境变量法】获取变量
 study = os.environ.get('STUDY', '')
-mode = 'gene'
+gene_summary_path = os.environ.get('GENE_SUMMARY', '')
+abresults_dir = os.environ.get('ABLRESULTS_DIR', '')
 
-print(f"🔍 搜索模式: */*/{study}/{mode}/**/summary_partial_*.csv")
+print(f"🔍 搜索模式: */*/{study}/gene/**/summary_partial_*.csv")
 
-# 【鲁棒搜索】从当前目录递归搜索
-# 支持任意嵌套深度，包括双重 results/results/ 路径
-search_pattern = f"./**/{study}/{mode}/**/summary_partial_*.csv"
+# 鲁棒搜索
+search_pattern = f"./**/{study}/gene/**/summary_partial_*.csv"
 partial_files = glob.glob(search_pattern, recursive=True)
 
 print(f"📁 绝对搜索路径: {os.path.abspath('.')}")
@@ -62,7 +81,6 @@ print(f"📁 找到 {len(partial_files)} 个匹配文件")
 
 if not partial_files:
     print("⚠️  未找到任何文件，扩大搜索范围...")
-    # 备选：搜索所有 summary_partial_*.csv
     all_partials = glob.glob("./**/summary_partial_*.csv", recursive=True)
     print(f"   扩大搜索找到 {len(all_partials)} 个文件，列出前10个:")
     for f in all_partials[:10]:
@@ -73,20 +91,18 @@ dfs = []
 found_folds = set()
 
 for file_path in partial_files:
-    # 【路径过滤】确保路径包含正确的 study 和 mode
-    if f"/{study}/" not in file_path or f"/{mode}/" not in file_path:
-        print(f"  ⏭️  跳过不匹配的文件: {file_path}")
+    # 路径过滤
+    if f"/{study}/" not in file_path or "/gene/" not in file_path:
         continue
 
     print(f"  📄 匹配: {file_path}")
 
-    # 【从文件名解析 Fold 编号】
-    # 文件名格式: summary_partial_{k_start}_{k_end}.csv
+    # 从文件名解析 fold 编号
     file_name = os.path.basename(file_path)
     match = re.search(r'summary_partial_(\d+)_(\d+)\.csv', file_name)
 
     if match:
-        fold_num = int(match.group(1))  # k_start 作为 fold 编号
+        fold_num = int(match.group(1))
         found_folds.add(fold_num)
 
         try:
@@ -99,7 +115,7 @@ for file_path in partial_files:
     else:
         print(f"     ⚠️  无法解析文件名: {file_name}")
 
-# 统计结果
+# 统计
 total_expected = 5
 found_count = len(found_folds)
 missing_folds = set(range(total_expected)) - found_folds
@@ -110,9 +126,6 @@ if missing_folds:
     print(f"   - 缺失: {sorted(missing_folds)}")
 else:
     print(f"   - 完成度: 100%")
-
-# 获取环境变量中的路径
-gene_summary_path = os.environ.get('ABLRESULTS_DIR', '') + '/gene/summary.csv'
 
 if dfs:
     result = pd.concat(dfs).sort_values('fold')
@@ -129,6 +142,8 @@ EOF_SUMMARY
 echo ""
 echo "📊 汇总 Text Only 结果..."
 TEXT_SUMMARY="${ABLRESULTS_DIR}/text/summary.csv"
+export TEXT_SUMMARY
+
 python3 << 'EOF_SUMMARY' | tee -a "${ABLRESULTS_DIR}/text_summarize.log"
 import pandas as pd
 import glob
@@ -137,11 +152,11 @@ import sys
 import re
 
 study = os.environ.get('STUDY', '')
-mode = 'text'
+text_summary_path = os.environ.get('TEXT_SUMMARY', '')
 
-print(f"🔍 搜索模式: */*/{study}/{mode}/**/summary_partial_*.csv")
+print(f"🔍 搜索模式: */*/{study}/text/**/summary_partial_*.csv")
 
-search_pattern = f"./**/{study}/{mode}/**/summary_partial_*.csv"
+search_pattern = f"./**/{study}/text/**/summary_partial_*.csv"
 partial_files = glob.glob(search_pattern, recursive=True)
 
 print(f"📁 绝对搜索路径: {os.path.abspath('.')}")
@@ -159,8 +174,7 @@ dfs = []
 found_folds = set()
 
 for file_path in partial_files:
-    if f"/{study}/" not in file_path or f"/{mode}/" not in file_path:
-        print(f"  ⏭️  跳过不匹配的文件: {file_path}")
+    if f"/{study}/" not in file_path or "/text/" not in file_path:
         continue
 
     print(f"  📄 匹配: {file_path}")
@@ -192,9 +206,6 @@ if missing_folds:
     print(f"   - 缺失: {sorted(missing_folds)}")
 else:
     print(f"   - 完成度: 100%")
-
-# 获取环境变量中的路径
-text_summary_path = os.environ.get('ABLRESULTS_DIR', '') + '/text/summary.csv'
 
 if dfs:
     result = pd.concat(dfs).sort_values('fold')
@@ -211,6 +222,8 @@ EOF_SUMMARY
 echo ""
 echo "📊 汇总 Fusion 结果..."
 FUSION_SUMMARY="${ABLRESULTS_DIR}/fusion/summary.csv"
+export FUSION_SUMMARY
+
 python3 << 'EOF_SUMMARY' | tee -a "${ABLRESULTS_DIR}/fusion_summarize.log"
 import pandas as pd
 import glob
@@ -219,11 +232,11 @@ import sys
 import re
 
 study = os.environ.get('STUDY', '')
-mode = 'fusion'
+fusion_summary_path = os.environ.get('FUSION_SUMMARY', '')
 
-print(f"🔍 搜索模式: */*/{study}/{mode}/**/summary_partial_*.csv")
+print(f"🔍 搜索模式: */*/{study}/fusion/**/summary_partial_*.csv")
 
-search_pattern = f"./**/{study}/{mode}/**/summary_partial_*.csv"
+search_pattern = f"./**/{study}/fusion/**/summary_partial_*.csv"
 partial_files = glob.glob(search_pattern, recursive=True)
 
 print(f"📁 绝对搜索路径: {os.path.abspath('.')}")
@@ -241,8 +254,7 @@ dfs = []
 found_folds = set()
 
 for file_path in partial_files:
-    if f"/{study}/" not in file_path or f"/{mode}/" not in file_path:
-        print(f"  ⏭️  跳过不匹配的文件: {file_path}")
+    if f"/{study}/" not in file_path or "/fusion/" not in file_path:
         continue
 
     print(f"  📄 匹配: {file_path}")
@@ -274,9 +286,6 @@ if missing_folds:
     print(f"   - 缺失: {sorted(missing_folds)}")
 else:
     print(f"   - 完成度: 100%")
-
-# 获取环境变量中的路径
-fusion_summary_path = os.environ.get('ABLRESULTS_DIR', '') + '/fusion/summary.csv'
 
 if dfs:
     result = pd.concat(dfs).sort_values('fold')

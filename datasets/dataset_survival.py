@@ -182,6 +182,39 @@ class SurvivalDatasetFactory:
             self.clinical_data = self.clinical_data.set_index('case_id')
         else:
             raise ValueError("case_id column not found in clinical data!")
+
+        # 【新增】如果 clinical_data 没有 text_report 列，尝试从 reports_clean 合并
+        if 'text_report' not in self.clinical_data.columns:
+            print(f"⚠️  clinical_data 中没有 text_report 列，尝试从 reports_clean 合并...")
+
+            # 检查 reports_clean 文件
+            reports_path = f"./datasets_csv/reports_clean/tcga_{study_name}_clinical.csv"
+            if os.path.exists(reports_path):
+                try:
+                    reports_df = pd.read_csv(reports_path)
+                    if 'text_report' in reports_df.columns:
+                        # 使用 case_id 作为关联键（两个文件的 case_id 相同）
+                        reports_df = reports_df.set_index('case_id')
+
+                        # 从 clinical_data 提取需要合并的 text_report
+                        text_reports = reports_df[['text_report']]
+
+                        # 合并
+                        self.clinical_data = self.clinical_data.merge(
+                            text_reports,
+                            left_index=True,
+                            right_index=True,
+                            how='left'
+                        )
+
+                        text_count = self.clinical_data['text_report'].notna().sum()
+                        print(f"✅ 成功合并 text_report: {text_count}/{len(self.clinical_data)} 个样本有文本数据")
+                    else:
+                        print(f"❌ reports_clean 文件中没有 text_report 列")
+                except Exception as e:
+                    print(f"❌ 合并 text_report 失败: {e}")
+            else:
+                print(f"❌ reports_clean 文件不存在: {reports_path}")
         
         if self.print_info:
             print(f"Loaded clinical data from: {path_to_data}")
@@ -554,10 +587,27 @@ class SurvivalDatasetFactory:
 
         # ============================================================
         # 【新增逻辑】支持嵌套CV：加载该折专属的特征文件
+        # 【修复】支持两种路径格式: features/${study}/ 和 features/tcga_${study}/
         # ============================================================
-        fold_feature_file = os.path.join(
+
+        # 优先使用不带tcga前缀的路径
+        fold_feature_file_v1 = os.path.join(
             f'features/{self.study}/fold_{fold}_genes.csv'
         )
+
+        # 备选使用tcga前缀的路径
+        fold_feature_file_v2 = os.path.join(
+            f'features/tcga_{self.study}/fold_{fold}_genes.csv'
+        )
+
+        # 选择存在的路径
+        if os.path.exists(fold_feature_file_v1):
+            fold_feature_file = fold_feature_file_v1
+        elif os.path.exists(fold_feature_file_v2):
+            fold_feature_file = fold_feature_file_v2
+        else:
+            # 两者都不存在，使用v1路径（保持原有报错逻辑）
+            fold_feature_file = fold_feature_file_v1
 
         # 【实锤日志】在读取前强制打印，让用户一眼看到
         print(f"🔍 [Data Loading] Loading gene features from: {fold_feature_file}")
