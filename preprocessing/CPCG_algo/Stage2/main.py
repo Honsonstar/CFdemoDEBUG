@@ -101,10 +101,10 @@ def cs_step_2(result_cs1, hazard_type):
     # 确保数据是数值型
     data = data.select_dtypes(include=[np.number])
     labels = data.columns.to_list()
-    
+
     try:
         # 1. 构建骨架
-        G = skeleton(data, alpha=0.05, max_l=2)
+        G = skeleton(data, alpha=0.10, max_l=2)
         G_nx = nx.from_numpy_array(np.array(G))
         
         # 2. 找到与 OS (hazard_type) 相关的邻居

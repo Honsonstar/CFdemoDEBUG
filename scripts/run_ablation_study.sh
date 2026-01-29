@@ -590,7 +590,7 @@ print(f"\n🎯 平均 C-Index:")
 print(f"   • Gene Only (仅基因): {gene_mean:.4f}" if not np.isnan(gene_mean) else "   • Gene Only (仅基因): N/A")
 print(f"   • Text Only (仅文本): {text_mean:.4f}" if not np.isnan(text_mean) else "   • Text Only (仅文本): N/A")
 print(f"   • Fusion (多模态融合): {fusion_mean:.4f}" if not np.isnan(fusion_mean) else "   • Fusion (多模态融合): N/A")
-print(f"\n📁 结果已保存到: ${FINAL_CSV}")
+print(f"\n📁 结果已保存到: {final_csv_path}")
 print("="*60)
 
 # 计算提升百分比

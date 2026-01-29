@@ -57,7 +57,7 @@ def _process_single_gene_semi(gene_data, cd, h_type, gene_name):
 
         # 4. Logrank Test
         results = logrank_test(d_l['OS'], d_h['OS'], d_l['Censor'], d_h['Censor'])
-        if results.p_value > 0.01:
+        if results.p_value > 0.05:
             return (gene_name, None, None)
             
         logrank_p = results.p_value / 2

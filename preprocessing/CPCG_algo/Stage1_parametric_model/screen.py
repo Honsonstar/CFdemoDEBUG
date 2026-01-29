@@ -70,7 +70,7 @@ def _process_single_gene(gene_data, cd, h_type, gene_name):
         # Logrank test
         results = logrank_test(d_l['OS'], d_h['OS'], d_l['Censor'], d_h['Censor'])
 
-        if results.p_value > 0.01:
+        if results.p_value > 0.05:
             return (gene_name, None)
 
         # 偏相关分析
