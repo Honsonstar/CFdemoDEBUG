@@ -6,7 +6,7 @@
 # ====================================================================
 
 # 默认运行的癌症类型
-DEFAULT_STUDIES="brca blca luad stad hnsc"
+DEFAULT_STUDIES="brca blca coadread stad hnsc"
 
 # 使用命令行参数或默认值
 STUDIES=${1:-$DEFAULT_STUDIES}
@@ -16,7 +16,7 @@ echo "🚀 批量运行完整流程"
 echo "=============================================="
 echo "📋 癌症类型: $STUDIES"
 echo "📊 流程步骤:"
-echo "   1️⃣  mRMR 特征选择 (k=30)"
+echo "   1️⃣  mRMR 特征选择 (k=200)"
 echo "   2️⃣  Stage2 PC算法精炼"
 echo "   3️⃣  消融实验 (Gene/Text/Fusion)"
 echo "=============================================="
@@ -26,7 +26,7 @@ echo ""
 SPLIT_DIR="splits/nested_cv"
 DATA_ROOT_DIR="datasets_csv/raw_rna_data/combine"
 CLINICAL_DIR="datasets_csv/clinical_data"
-THRESHOLD=30
+THRESHOLD=200
 
 # 日志目录
 TODAY=$(date +%Y-%m-%d_%H-%M-%S)

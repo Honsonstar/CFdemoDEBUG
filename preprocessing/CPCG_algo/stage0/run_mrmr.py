@@ -35,7 +35,7 @@ class MRMRFeatureSelector:
     # 输出根目录（绝对路径）
     OUTPUT_ROOT = '/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features'
     
-    def __init__(self, study, data_root_dir, clinical_dir=None, threshold=30, n_jobs=-1):
+    def __init__(self, study, data_root_dir, clinical_dir=None, threshold=200, n_jobs=-1):
         """
         初始化 mRMR 特征选择器
         
@@ -43,7 +43,7 @@ class MRMRFeatureSelector:
             study: 癌症类型 (e.g., 'brca', 'luad')
             data_root_dir: 数据根目录，包含 {study}/rna_clean.csv
             clinical_dir: 临床数据目录，包含 tcga_{study}_clinical.csv
-            threshold: 选择的特征数量 K (默认: 30)
+            threshold: 选择的特征数量 K (默认: 200)
             n_jobs: 并行任务数 (-1 表示使用所有 CPU)
         """
         self.study = study
@@ -347,8 +347,8 @@ def main():
                         help='数据根目录，包含 {study}/rna_clean.csv')
     parser.add_argument('--clinical_dir', type=str, default=None,
                         help='临床数据目录，包含 tcga_{study}_clinical.csv')
-    parser.add_argument('--threshold', type=int, default=30,
-                        help='选择的特征数量 K (默认: 30)')
+    parser.add_argument('--threshold', type=int, default=200,
+                        help='选择的特征数量 K (默认: 200)')
     parser.add_argument('--n_jobs', type=int, default=-1,
                         help='并行任务数 (-1 表示使用所有 CPU)')
     

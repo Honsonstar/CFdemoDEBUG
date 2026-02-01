@@ -1,0 +1,44 @@
+[Info] 发现 5 个 folds: [0, 1, 2, 3, 4]
+
+============================================================
+[Fold 0] 处理中...
+         划分文件: splits/nested_cv/brca/nested_splits_0.csv
+============================================================
+[Info] 划分信息: Train=573, Val=105, Test=174
+
+[brca] Fold 0: 开始 mRMR 特征筛选 (Train=573)
+  [数据] 表达矩阵: 939 样本 x 4999 基因
+  [数据] 临床数据: 1093 样本 (ID列: case_id, 文件: datasets_csv/clinical_data/tcga_brca_clinical.csv)
+  [匹配] 输入 Train IDs=573 -> 匹配到临床样本=628
+  [准备] 训练数据: 572 样本 x 4999 特征
+  [目标] censorship: {1.0: 504, 0.0: 68}
+  [mRMR] 开始选择 Top 200 个特征...
+         输入: 572 样本 x 4999 特征
+Exception ignored in: <function _get_module_lock.<locals>.cb at 0x7f6eb75e21f0>
+Traceback (most recent call last):
+  File "<frozen importlib._bootstrap>", line 177, in cb
+KeyboardInterrupt: 
+Traceback (most recent call last):
+  File "preprocessing/CPCG_algo/stage0/run_mrmr.py", line 479, in <module>
+    main()
+  File "preprocessing/CPCG_algo/stage0/run_mrmr.py", line 413, in main
+    output_file = selector.select_features_for_fold(
+  File "preprocessing/CPCG_algo/stage0/run_mrmr.py", line 91, in select_features_for_fold
+    selected_genes = self._run_mrmr(X_train, y_train)
+  File "preprocessing/CPCG_algo/stage0/run_mrmr.py", line 250, in _run_mrmr
+    selected_genes = mrmr_classif(
+  File "/root/miniconda3/lib/python3.8/site-packages/mrmr/pandas.py", line 171, in mrmr_classif
+    return mrmr_base(K=K, relevance_func=relevance_func, redundancy_func=redundancy_func,
+  File "/root/miniconda3/lib/python3.8/site-packages/mrmr/main.py", line 98, in mrmr_base
+    relevance = relevance_func(**relevance_args)
+  File "/root/miniconda3/lib/python3.8/site-packages/mrmr/pandas.py", line 45, in f_classif
+    return parallel_df(_f_classif, X, y, n_jobs=n_jobs)
+  File "/root/miniconda3/lib/python3.8/site-packages/mrmr/pandas.py", line 17, in parallel_df
+    lst = Parallel(n_jobs=n_jobs)(
+  File "/root/miniconda3/lib/python3.8/site-packages/joblib/parallel.py", line 2007, in __call__
+    return output if self.return_generator else list(output)
+  File "/root/miniconda3/lib/python3.8/site-packages/joblib/parallel.py", line 1650, in _get_outputs
+    yield from self._retrieve()
+  File "/root/miniconda3/lib/python3.8/site-packages/joblib/parallel.py", line 1762, in _retrieve
+    time.sleep(0.01)
+KeyboardInterrupt
