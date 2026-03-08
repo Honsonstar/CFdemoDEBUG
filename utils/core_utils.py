@@ -302,9 +302,25 @@ def _init_optim(args, model):
     return optimizer
 
 def _init_model(args):
-    
+
     print('\nInit Model...', end=' ')
-    if args.type_of_path == "custom":
+
+    # 【修复】优先使用嵌套CV的基因数量
+    if hasattr(args, 'nested_cv_omic_dim') and args.nested_cv_omic_dim:
+        # 获取当前 fold 的基因数量
+        fold = getattr(args, 'k', 0)  # 获取当前 fold
+        if fold in args.nested_cv_omic_dim:
+            omics_input_dim = args.nested_cv_omic_dim[fold]
+            print(f"  [Nested CV] Using gene dimension: {omics_input_dim} (fold {fold})")
+        else:
+            # 如果找不到，使用第一个可用的
+            omics_input_dim = list(args.nested_cv_omic_dim.values())[0]
+            print(f"  [Nested CV] Using gene dimension: {omics_input_dim}")
+    elif hasattr(args, 'omic_sizes') and args.omic_sizes is not None and len(args.omic_sizes) > 0:
+        # 使用数据集中更新后的基因数量
+        omics_input_dim = args.omic_sizes[0]
+        print(f"  [Nested CV] Using omic_sizes: {omics_input_dim}")
+    elif args.type_of_path == "custom":
         import pandas as pd
         # 读取第一行来判断有多少列
         if os.path.exists(args.omics_dir):

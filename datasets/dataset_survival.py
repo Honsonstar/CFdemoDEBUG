@@ -587,26 +587,62 @@ class SurvivalDatasetFactory:
 
         # ============================================================
         # 【新增逻辑】支持嵌套CV：加载该折专属的特征文件
-        # 【修复】支持两种路径格式: features/${study}/ 和 features/tcga_${study}/
+        # 【修复】支持多种路径格式:
+        #   1. features/${study}/fold_{fold}_genes.csv
+        #   2. features/tcga_${study}/fold_{fold}_genes.csv
+        #   3. features/mrmr_stage2_${study}/fold_{fold}_genes.csv
+        #   4. preprocessing/CGI/data/${study}_found_genes/${study}_found_Genes_fold{fold}.csv
         # ============================================================
 
-        # 优先使用不带tcga前缀的路径
+        # 获取不带 tcga_ 前缀的 study name
+        study_name = self.study.replace('tcga_', '') if self.study.startswith('tcga_') else self.study
+
+        # 路径1: features/{study}/fold_{fold}_genes.csv (例如 features/coadread/)
         fold_feature_file_v1 = os.path.join(
-            f'features/{self.study}/fold_{fold}_genes.csv'
+            f'features/{study_name}/fold_{fold}_genes.csv'
         )
 
-        # 备选使用tcga前缀的路径
+        # 路径2: features/tcga_{study}/fold_{fold}_genes.csv (例如 features/tcga_coadread/)
         fold_feature_file_v2 = os.path.join(
-            f'features/tcga_{self.study}/fold_{fold}_genes.csv'
+            f'features/tcga_{study_name}/fold_{fold}_genes.csv'
         )
 
-        # 选择存在的路径
-        if os.path.exists(fold_feature_file_v1):
+        # 路径3: features/mrmr_stage2_{study}/fold_{fold}_genes.csv (例如 features/mrmr_stage2_coadread/)
+        fold_feature_file_v3 = os.path.join(
+            f'features/mrmr_stage2_{study_name}/fold_{fold}_genes.csv'
+        )
+
+        # 路径4: CGI 特征文件 (例如 preprocessing/CGI/data/coadread_found_genes/coadread_found_Genes_fold0.csv)
+        fold_feature_file_cgi = os.path.join(
+            f'preprocessing/CGI/data/{study_name}_found_genes/{study_name}_found_Genes_fold{fold}.csv'
+        )
+
+        # 选择存在的路径 (按优先级)
+        # 优先级: CGI > features/{study} > mRMR Stage2
+        # 说明：CGI 只在 CGI 模式下使用（splits/CGI_nested_cv），其他模式用 mRMR
+        fold_feature_file = None
+
+        # 检查是否是 CGI 模式（通过 split_dir 判断）
+        split_dir = getattr(args, 'split_dir', '') if hasattr(args, 'split_dir') else ''
+        is_cgi_mode = 'CGI' in split_dir or 'cgi' in str(fold_feature_file_cgi)
+
+        if is_cgi_mode and os.path.exists(fold_feature_file_cgi):
+            # CGI 模式：优先使用 CGI 特征文件
+            fold_feature_file = fold_feature_file_cgi
+        elif os.path.exists(fold_feature_file_v1):
+            # features/{study}/fold_X_genes.csv
             fold_feature_file = fold_feature_file_v1
         elif os.path.exists(fold_feature_file_v2):
+            # features/tcga_{study}/fold_X_genes.csv
             fold_feature_file = fold_feature_file_v2
+        elif os.path.exists(fold_feature_file_v3):
+            # mRMR Stage2 特征文件
+            fold_feature_file = fold_feature_file_v3
+        elif os.path.exists(fold_feature_file_cgi):
+            # CGI 特征文件（备选）
+            fold_feature_file = fold_feature_file_cgi
         else:
-            # 两者都不存在，使用v1路径（保持原有报错逻辑）
+            # 全部不存在，使用v1路径（保持原有报错逻辑）
             fold_feature_file = fold_feature_file_v1
 
         # 【实锤日志】在读取前强制打印，让用户一眼看到
@@ -615,8 +651,16 @@ class SurvivalDatasetFactory:
         custom_omics_dict = None
         if os.path.exists(fold_feature_file):
             print(f"🔄 [Nested CV] Loading dynamic features for Fold {fold}: {fold_feature_file}")
-            # 读取该折的特征文件 (格式: sample_id, OS, gene1, gene2...)
-            fold_df = pd.read_csv(fold_feature_file, index_col=0) # 假设第一列是sample_id
+            # 读取该折的特征文件
+            # CGI 格式: 基因在行，样本在列 (需要转置)
+            # 其他格式: 样本在行，基因在列
+            fold_df = pd.read_csv(fold_feature_file, index_col=0)
+
+            # 检测是否是 CGI 格式（第一列 index 叫 gene_name）
+            if fold_df.index.name == 'gene_name' or fold_df.index[0] == 'gene_name':
+                print(f"🔄 [CGI Format] 检测到 CGI 格式文件，需要转置...")
+                fold_df = fold_df.T  # 转置: 基因在列，样本在行
+                fold_df.index.name = None
 
             # 【优先级1】ID截取逻辑：确保ID格式匹配（截取前12位）
             fold_df.index = fold_df.index.str[:12]
@@ -631,12 +675,15 @@ class SurvivalDatasetFactory:
             custom_omics_dict['rna'] = fold_df
 
             # 更新输入的基因维度，因为每一折选出来的基因数可能不一样
-            if hasattr(args, 'omic_sizes'):
-                # 假设 rna 是第一个模态
-                # 注意：如果你的模型是多模态固定输入维度的，这里可能会报错，
-                # 需要根据实际情况调整
-                args.omic_sizes[0] = len(fold_df.columns)
-                print(f"📏 [Nested CV] Updated omic_sizes[0] to {len(fold_df.columns)} for Fold {fold}")
+            # 直接从 fold_df 获取基因数量
+            num_genes = len(fold_df.columns)
+            print(f"📏 [Nested CV] Detected {num_genes} genes for Fold {fold}")
+
+            # 存储到 args 中，确保模型初始化时能获取到
+            if not hasattr(args, 'nested_cv_omic_dim'):
+                args.nested_cv_omic_dim = {}
+            args.nested_cv_omic_dim[fold] = num_genes
+            print(f"📏 [Nested CV] Stored omic_dim for fold {fold}: {num_genes}")
 
         # [新代码] 自动兼容 'val' 或 'test' 列名
         print("Defining datasets...")
@@ -658,7 +705,8 @@ class SurvivalDatasetFactory:
 
         # 如果没有嵌套CV特征文件，使用默认的 omic_sizes
         if custom_omics_dict is None:
-            args.omic_sizes = args.dataset_factory.omic_sizes
+            if hasattr(args, 'dataset_factory') and args.dataset_factory is not None:
+                args.omic_sizes = args.dataset_factory.omic_sizes
 
         # 【优先级2】调试打印：检查训练集大小
         print(f"DEBUG: Train Set Size: {len(train_split)}")

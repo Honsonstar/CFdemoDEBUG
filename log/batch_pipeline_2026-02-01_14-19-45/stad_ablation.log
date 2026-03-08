@@ -1,0 +1,130 @@
+🚀 开始多模态消融实验: stad (mRMR+Stage2)
+📁 特征路径: features/mrmr_stage2_stad
+📁 日志目录: log/2026-02-01/stad_mrmr_stage2
+📁 结果将保存到: results/ablation_mrmr_stage2/stad
+==============================================
+
+==============================================
+🚀 开始多模态消融实验: stad (mRMR+Stage2)
+📁 特征路径: features/mrmr_stage2_stad
+📁 日志目录: log/2026-02-01/stad_mrmr_stage2
+==============================================
+📁 结果目录: results/ablation_mrmr_stage2/stad
+🔍 检查 STAD 的 mRMR+Stage2 特征文件...
+   ✓ Fold 0: fold_0_genes.csv 存在
+   ✓ Fold 1: fold_1_genes.csv 存在
+   ✓ Fold 2: fold_2_genes.csv 存在
+   ✓ Fold 3: fold_3_genes.csv 存在
+   ✓ Fold 4: fold_4_genes.csv 存在
+✅ stad mRMR+Stage2 特征文件检查通过
+==============================================
+🧬 Gene Only (仅基因 - mRMR+Stage2)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation_mrmr_stage2/stad/gene/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation_mrmr_stage2/stad/gene/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation_mrmr_stage2/stad/gene/fold_2/training.log)
+  └─ 达到最大并发数 3，等待任务完成...
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 3... (日志: results/ablation_mrmr_stage2/stad/gene/fold_3/training.log)
+  └─ 启动 Fold 4... (日志: results/ablation_mrmr_stage2/stad/gene/fold_4/training.log)
+  └─ 等待剩余 2 个任务完成...
+  └─ Gene Only (仅基因 - mRMR+Stage2) 所有 Fold 完成
+
+📊 汇总 Gene Only 结果...
+📁 搜索结果目录: results/ablation_mrmr_stage2/stad/gene
+  📂 检查 Fold 0 目录: results/ablation_mrmr_stage2/stad/gene/fold_0
+     ✗ Fold 0: 文件缺失
+  📂 检查 Fold 1 目录: results/ablation_mrmr_stage2/stad/gene/fold_1
+     ✗ Fold 1: 文件缺失
+  📂 检查 Fold 2 目录: results/ablation_mrmr_stage2/stad/gene/fold_2
+     ✗ Fold 2: 文件缺失
+  📂 检查 Fold 3 目录: results/ablation_mrmr_stage2/stad/gene/fold_3
+     ✗ Fold 3: 文件缺失
+  📂 检查 Fold 4 目录: results/ablation_mrmr_stage2/stad/gene/fold_4
+     ✗ Fold 4: 文件缺失
+⚠️  缺失折数: [0, 1, 2, 3, 4]
+❌ 错误: 没有任何折的结果文件可用
+  └─ 汇总完成: results/ablation_mrmr_stage2/stad/gene/summary.csv
+==============================================
+🧬 Text Only (仅文本)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation_mrmr_stage2/stad/text/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation_mrmr_stage2/stad/text/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation_mrmr_stage2/stad/text/fold_2/training.log)
+  └─ 达到最大并发数 3，等待任务完成...
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 3... (日志: results/ablation_mrmr_stage2/stad/text/fold_3/training.log)
+  └─ 启动 Fold 4... (日志: results/ablation_mrmr_stage2/stad/text/fold_4/training.log)
+  └─ 等待剩余 2 个任务完成...
+  └─ Text Only (仅文本) 所有 Fold 完成
+
+📊 汇总 Text Only 结果...
+📁 搜索结果目录: results/ablation_mrmr_stage2/stad/text
+  📂 检查 Fold 0 目录: results/ablation_mrmr_stage2/stad/text/fold_0
+     ✗ Fold 0: 文件缺失
+  📂 检查 Fold 1 目录: results/ablation_mrmr_stage2/stad/text/fold_1
+     ✗ Fold 1: 文件缺失
+  📂 检查 Fold 2 目录: results/ablation_mrmr_stage2/stad/text/fold_2
+     ✗ Fold 2: 文件缺失
+  📂 检查 Fold 3 目录: results/ablation_mrmr_stage2/stad/text/fold_3
+     ✗ Fold 3: 文件缺失
+  📂 检查 Fold 4 目录: results/ablation_mrmr_stage2/stad/text/fold_4
+     ✗ Fold 4: 文件缺失
+⚠️  缺失折数: [0, 1, 2, 3, 4]
+❌ 错误: 没有任何折的结果文件可用
+  └─ 汇总完成: results/ablation_mrmr_stage2/stad/text/summary.csv
+==============================================
+🧬 Fusion (多模态融合)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation_mrmr_stage2/stad/fusion/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation_mrmr_stage2/stad/fusion/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation_mrmr_stage2/stad/fusion/fold_2/training.log)
+  └─ 达到最大并发数 3，等待任务完成...
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 3... (日志: results/ablation_mrmr_stage2/stad/fusion/fold_3/training.log)
+  └─ 启动 Fold 4... (日志: results/ablation_mrmr_stage2/stad/fusion/fold_4/training.log)
+  └─ 等待剩余 2 个任务完成...
+  └─ Fusion (多模态融合) 所有 Fold 完成
+
+📊 汇总 Fusion 结果...
+📁 搜索结果目录: results/ablation_mrmr_stage2/stad/fusion
+  📂 检查 Fold 0 目录: results/ablation_mrmr_stage2/stad/fusion/fold_0
+     ✗ Fold 0: 文件缺失
+  📂 检查 Fold 1 目录: results/ablation_mrmr_stage2/stad/fusion/fold_1
+     ✗ Fold 1: 文件缺失
+  📂 检查 Fold 2 目录: results/ablation_mrmr_stage2/stad/fusion/fold_2
+     ✗ Fold 2: 文件缺失
+  📂 检查 Fold 3 目录: results/ablation_mrmr_stage2/stad/fusion/fold_3
+     ✗ Fold 3: 文件缺失
+  📂 检查 Fold 4 目录: results/ablation_mrmr_stage2/stad/fusion/fold_4
+     ✗ Fold 4: 文件缺失
+⚠️  缺失折数: [0, 1, 2, 3, 4]
+❌ 错误: 没有任何折的结果文件可用
+  └─ 汇总完成: results/ablation_mrmr_stage2/stad/fusion/summary.csv
+
+==============================================
+📈 生成最终对比表格
+==============================================
+📊 读取各模式汇总结果...
+  ✓ Gene Only (mRMR+Stage2): 成功读取 0 条记录
+  ✓ Text Only: 成功读取 0 条记录
+  ✓ Fusion: 成功读取 0 条记录
+
+📊 构建对比表格 (共 0 折)...
+Traceback (most recent call last):
+  File "<stdin>", line 88, in <module>
+  File "/root/miniconda3/lib/python3.8/site-packages/pandas/core/frame.py", line 3761, in __getitem__
+    indexer = self.columns.get_loc(key)
+  File "/root/miniconda3/lib/python3.8/site-packages/pandas/core/indexes/range.py", line 349, in get_loc
+    raise KeyError(key)
+KeyError: 'Gene_C_Index'
+
+✅ 消融实验完成！
+==============================================
+📁 结果目录: results/ablation_mrmr_stage2/stad
+📊 对比表格: results/ablation_mrmr_stage2/stad/final_comparison.csv
+📋 报告文件: report/2026-02-01_stad_ablation_mrmr_stage2_comparison.csv
+⚡ 并行任务数: 3
+🧬 特征类型: mRMR+Stage2 (PC算法精炼)
+==============================================
+📁 已复制结果到: report/2026-02-01_stad_ablation_mrmr_stage2_comparison.csv

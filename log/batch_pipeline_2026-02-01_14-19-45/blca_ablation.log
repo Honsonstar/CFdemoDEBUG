@@ -1,0 +1,145 @@
+🚀 开始多模态消融实验: blca (mRMR+Stage2)
+📁 特征路径: features/mrmr_stage2_blca
+📁 日志目录: log/2026-02-01/blca_mrmr_stage2
+📁 结果将保存到: results/ablation_mrmr_stage2/blca
+==============================================
+
+==============================================
+🚀 开始多模态消融实验: blca (mRMR+Stage2)
+📁 特征路径: features/mrmr_stage2_blca
+📁 日志目录: log/2026-02-01/blca_mrmr_stage2
+==============================================
+📁 结果目录: results/ablation_mrmr_stage2/blca
+🔍 检查 BLCA 的 mRMR+Stage2 特征文件...
+   ✓ Fold 0: fold_0_genes.csv 存在
+   ✓ Fold 1: fold_1_genes.csv 存在
+   ✓ Fold 2: fold_2_genes.csv 存在
+   ✓ Fold 3: fold_3_genes.csv 存在
+   ✓ Fold 4: fold_4_genes.csv 存在
+✅ blca mRMR+Stage2 特征文件检查通过
+==============================================
+🧬 Gene Only (仅基因 - mRMR+Stage2)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation_mrmr_stage2/blca/gene/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation_mrmr_stage2/blca/gene/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation_mrmr_stage2/blca/gene/fold_2/training.log)
+  └─ 达到最大并发数 3，等待任务完成...
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 3... (日志: results/ablation_mrmr_stage2/blca/gene/fold_3/training.log)
+  └─ 启动 Fold 4... (日志: results/ablation_mrmr_stage2/blca/gene/fold_4/training.log)
+  └─ 等待剩余 2 个任务完成...
+  └─ Gene Only (仅基因 - mRMR+Stage2) 所有 Fold 完成
+
+📊 汇总 Gene Only 结果...
+📁 搜索结果目录: results/ablation_mrmr_stage2/blca/gene
+  📂 检查 Fold 0 目录: results/ablation_mrmr_stage2/blca/gene/fold_0
+     ✓ Fold 0: 使用 summary_partial_0_0.csv
+  📂 检查 Fold 1 目录: results/ablation_mrmr_stage2/blca/gene/fold_1
+     ✓ Fold 1: 使用 summary_partial_1_1.csv
+  📂 检查 Fold 2 目录: results/ablation_mrmr_stage2/blca/gene/fold_2
+     ✓ Fold 2: 使用 summary_partial_2_2.csv
+  📂 检查 Fold 3 目录: results/ablation_mrmr_stage2/blca/gene/fold_3
+     ✓ Fold 3: 使用 summary_partial_3_3.csv
+  📂 检查 Fold 4 目录: results/ablation_mrmr_stage2/blca/gene/fold_4
+     ✓ Fold 4: 使用 summary_partial_4_4.csv
+✅ Gene Only (mRMR+Stage2) 汇总完成: 5/5 折成功
+   平均 C-Index: 0.6447
+  └─ 汇总完成: results/ablation_mrmr_stage2/blca/gene/summary.csv
+==============================================
+🧬 Text Only (仅文本)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation_mrmr_stage2/blca/text/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation_mrmr_stage2/blca/text/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation_mrmr_stage2/blca/text/fold_2/training.log)
+  └─ 达到最大并发数 3，等待任务完成...
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 3... (日志: results/ablation_mrmr_stage2/blca/text/fold_3/training.log)
+  └─ 启动 Fold 4... (日志: results/ablation_mrmr_stage2/blca/text/fold_4/training.log)
+  └─ 等待剩余 2 个任务完成...
+  └─ Text Only (仅文本) 所有 Fold 完成
+
+📊 汇总 Text Only 结果...
+📁 搜索结果目录: results/ablation_mrmr_stage2/blca/text
+  📂 检查 Fold 0 目录: results/ablation_mrmr_stage2/blca/text/fold_0
+     ✓ Fold 0: 使用 summary_partial_0_0.csv
+  📂 检查 Fold 1 目录: results/ablation_mrmr_stage2/blca/text/fold_1
+     ✓ Fold 1: 使用 summary_partial_1_1.csv
+  📂 检查 Fold 2 目录: results/ablation_mrmr_stage2/blca/text/fold_2
+     ✓ Fold 2: 使用 summary_partial_2_2.csv
+  📂 检查 Fold 3 目录: results/ablation_mrmr_stage2/blca/text/fold_3
+     ✓ Fold 3: 使用 summary_partial_3_3.csv
+  📂 检查 Fold 4 目录: results/ablation_mrmr_stage2/blca/text/fold_4
+     ✓ Fold 4: 使用 summary_partial_4_4.csv
+✅ Text Only 汇总完成: 5/5 折成功
+   平均 C-Index: 0.6251
+  └─ 汇总完成: results/ablation_mrmr_stage2/blca/text/summary.csv
+==============================================
+🧬 Fusion (多模态融合)
+==============================================
+  └─ 启动 Fold 0... (日志: results/ablation_mrmr_stage2/blca/fusion/fold_0/training.log)
+  └─ 启动 Fold 1... (日志: results/ablation_mrmr_stage2/blca/fusion/fold_1/training.log)
+  └─ 启动 Fold 2... (日志: results/ablation_mrmr_stage2/blca/fusion/fold_2/training.log)
+  └─ 达到最大并发数 3，等待任务完成...
+  └─ 任务完成，继续启动下一批
+  └─ 启动 Fold 3... (日志: results/ablation_mrmr_stage2/blca/fusion/fold_3/training.log)
+  └─ 启动 Fold 4... (日志: results/ablation_mrmr_stage2/blca/fusion/fold_4/training.log)
+  └─ 等待剩余 2 个任务完成...
+  └─ Fusion (多模态融合) 所有 Fold 完成
+
+📊 汇总 Fusion 结果...
+📁 搜索结果目录: results/ablation_mrmr_stage2/blca/fusion
+  📂 检查 Fold 0 目录: results/ablation_mrmr_stage2/blca/fusion/fold_0
+     ✓ Fold 0: 使用 summary_partial_0_0.csv
+  📂 检查 Fold 1 目录: results/ablation_mrmr_stage2/blca/fusion/fold_1
+     ✓ Fold 1: 使用 summary_partial_1_1.csv
+  📂 检查 Fold 2 目录: results/ablation_mrmr_stage2/blca/fusion/fold_2
+     ✓ Fold 2: 使用 summary_partial_2_2.csv
+  📂 检查 Fold 3 目录: results/ablation_mrmr_stage2/blca/fusion/fold_3
+     ✓ Fold 3: 使用 summary_partial_3_3.csv
+  📂 检查 Fold 4 目录: results/ablation_mrmr_stage2/blca/fusion/fold_4
+     ✓ Fold 4: 使用 summary_partial_4_4.csv
+✅ Fusion 汇总完成: 5/5 折成功
+   平均 C-Index: 0.6764
+  └─ 汇总完成: results/ablation_mrmr_stage2/blca/fusion/summary.csv
+
+==============================================
+📈 生成最终对比表格
+==============================================
+📊 读取各模式汇总结果...
+  ✓ Gene Only (mRMR+Stage2): 成功读取 5 条记录
+  ✓ Text Only: 成功读取 5 条记录
+  ✓ Fusion: 成功读取 5 条记录
+
+📊 构建对比表格 (共 5 折)...
+
+============================================================
+📊 多模态消融实验结果汇总 (mRMR+Stage2)
+============================================================
+ Fold  Gene_C_Index  Text_C_Index  Fusion_C_Index
+    0      0.671988      0.683599        0.722787
+    1      0.562691      0.588685        0.602446
+    2      0.625190      0.581942        0.603945
+    3      0.646628      0.605572        0.718475
+    4      0.716981      0.665881        0.734277
+============================================================
+
+🎯 平均 C-Index:
+   • Gene Only (mRMR+Stage2): 0.6447
+   • Text Only (仅文本): 0.6251
+   • Fusion (多模态融合): 0.6764
+
+📁 结果已保存到: results/ablation_mrmr_stage2/blca/final_comparison.csv
+============================================================
+
+📈 Fusion 相对于 Gene Only (mRMR+Stage2) 的提升: +4.92%
+📈 Fusion 相对于 Text Only 的提升: +8.20%
+
+✅ 消融实验完成！
+==============================================
+📁 结果目录: results/ablation_mrmr_stage2/blca
+📊 对比表格: results/ablation_mrmr_stage2/blca/final_comparison.csv
+📋 报告文件: report/2026-02-01_blca_ablation_mrmr_stage2_comparison.csv
+⚡ 并行任务数: 3
+🧬 特征类型: mRMR+Stage2 (PC算法精炼)
+==============================================
+📁 已复制结果到: report/2026-02-01_blca_ablation_mrmr_stage2_comparison.csv

@@ -1,0 +1,295 @@
+==========================================
+Stage 2 特征精炼 (PC算法)
+==========================================
+   癌种: coadread
+==========================================
+\n🔍 检查必要文件...
+✅ mRMR 输入目录: features/mrmr_coadread
+  ✓ Fold 0: features/mrmr_coadread/fold_0_genes.csv
+  ✓ Fold 1: features/mrmr_coadread/fold_1_genes.csv
+  ✓ Fold 2: features/mrmr_coadread/fold_2_genes.csv
+  ✓ Fold 3: features/mrmr_coadread/fold_3_genes.csv
+  ✓ Fold 4: features/mrmr_coadread/fold_4_genes.csv
+✅ 临床数据: datasets_csv/clinical_data/tcga_coadread_clinical.csv
+\n✅ 所有必要文件检查通过
+\n🧬 开始 Stage 2 特征精炼（PC算法）...
+==========================================
+[Info] 发现 5 个 folds: [0, 1, 2, 3, 4]
+
+============================================================
+[Fold 0] 处理中...
+============================================================
+
+[coadread] Fold 0: 开始 Stage 2 特征精炼...
+  [数据] mRMR 基因文件: 200 基因 x 271 样本
+  [数据] 临床数据: 274 样本, OS列: survival_months
+         有效 OS 值: 274 / 274
+  [合并] 基因数据 271 样本 + 临床数据 274 样本
+         -> 合并后 276 样本 (OS + 200 基因)
+    [Depth 0] 向量化计算皮尔逊相关性矩阵...
+    [Depth 0] 向量化计算完成，处理 20100 对变量
+    [Depth 0] 正在处理 8930 条边...
+    [Depth 1] 正在处理 8930 条边...
+[Parallel(n_jobs=-1)]: Using backend LokyBackend with 16 concurrent workers.
+[Parallel(n_jobs=-1)]: Done  40 tasks      | elapsed:    1.8s
+[Parallel(n_jobs=-1)]: Done 168 tasks      | elapsed:    2.1s
+[Parallel(n_jobs=-1)]: Done 2080 tasks      | elapsed:    2.8s
+[Parallel(n_jobs=-1)]: Done 12448 tasks      | elapsed:    5.1s
+[Parallel(n_jobs=-1)]: Done 25120 tasks      | elapsed:    7.5s
+[Parallel(n_jobs=-1)]: Done 40096 tasks      | elapsed:   10.3s
+[Parallel(n_jobs=-1)]: Done 57376 tasks      | elapsed:   13.6s
+[Parallel(n_jobs=-1)]: Done 76960 tasks      | elapsed:   17.3s
+[Parallel(n_jobs=-1)]: Done 98848 tasks      | elapsed:   21.4s
+[Parallel(n_jobs=-1)]: Done 123040 tasks      | elapsed:   25.9s
+[Parallel(n_jobs=-1)]: Done 149536 tasks      | elapsed:   30.6s
+[Parallel(n_jobs=-1)]: Done 178336 tasks      | elapsed:   35.9s
+[Parallel(n_jobs=-1)]: Done 209440 tasks      | elapsed:   41.7s
+[Parallel(n_jobs=-1)]: Done 242848 tasks      | elapsed:   47.9s
+[Parallel(n_jobs=-1)]: Done 278560 tasks      | elapsed:   54.3s
+[Parallel(n_jobs=-1)]: Done 316576 tasks      | elapsed:  1.0min
+[Parallel(n_jobs=-1)]: Done 356896 tasks      | elapsed:  1.2min
+[Parallel(n_jobs=-1)]: Done 399520 tasks      | elapsed:  1.3min
+[Parallel(n_jobs=-1)]: Done 444448 tasks      | elapsed:  1.4min
+[Parallel(n_jobs=-1)]: Done 491680 tasks      | elapsed:  1.6min
+[Parallel(n_jobs=-1)]: Done 541216 tasks      | elapsed:  1.7min
+[Parallel(n_jobs=-1)]: Done 593056 tasks      | elapsed:  1.9min
+[Parallel(n_jobs=-1)]: Done 647200 tasks      | elapsed:  2.0min
+[Parallel(n_jobs=-1)]: Done 703648 tasks      | elapsed:  2.2min
+[Parallel(n_jobs=-1)]: Done 762400 tasks      | elapsed:  2.4min
+[Parallel(n_jobs=-1)]: Done 823456 tasks      | elapsed:  2.6min
+[Parallel(n_jobs=-1)]: Done 837301 out of 837301 | elapsed:  2.6min finished
+[Parallel(n_jobs=-1)]: Using backend LokyBackend with 16 concurrent workers.
+[Parallel(n_jobs=-1)]: Done  48 tasks      | elapsed:    0.1s
+[Parallel(n_jobs=-1)]: Done 512 tasks      | elapsed:    0.4s
+[Parallel(n_jobs=-1)]: Done 6112 tasks      | elapsed:    1.6s
+[Parallel(n_jobs=-1)]: Done 16480 tasks      | elapsed:    3.8s
+[Parallel(n_jobs=-1)]: Done 29152 tasks      | elapsed:    6.3s
+[Parallel(n_jobs=-1)]: Done 44128 tasks      | elapsed:    8.8s
+[Parallel(n_jobs=-1)]: Done 61408 tasks      | elapsed:   11.8s
+[Parallel(n_jobs=-1)]: Done 80992 tasks      | elapsed:   15.2s
+[Parallel(n_jobs=-1)]: Done 102880 tasks      | elapsed:   18.8s
+[Parallel(n_jobs=-1)]: Done 127072 tasks      | elapsed:   22.8s
+[Parallel(n_jobs=-1)]: Done 153568 tasks      | elapsed:   27.2s
+[Parallel(n_jobs=-1)]: Done 182368 tasks      | elapsed:   32.3s
+[Parallel(n_jobs=-1)]: Done 213472 tasks      | elapsed:   37.7s
+[Parallel(n_jobs=-1)]: Done 246880 tasks      | elapsed:   43.2s
+[Parallel(n_jobs=-1)]: Done 282592 tasks      | elapsed:   49.2s
+[Parallel(n_jobs=-1)]: Done 320608 tasks      | elapsed:   55.7s
+[Parallel(n_jobs=-1)]: Done 360928 tasks      | elapsed:  1.0min
+[Parallel(n_jobs=-1)]: Done 403552 tasks      | elapsed:  1.2min
+[Parallel(n_jobs=-1)]: Done 448480 tasks      | elapsed:  1.3min
+[Parallel(n_jobs=-1)]: Done 495712 tasks      | elapsed:  1.4min
+[Parallel(n_jobs=-1)]: Done 545248 tasks      | elapsed:  1.6min
+[Parallel(n_jobs=-1)]: Done 597088 tasks      | elapsed:  1.7min
+[Parallel(n_jobs=-1)]: Done 651232 tasks      | elapsed:  1.9min
+[Parallel(n_jobs=-1)]: Done 707680 tasks      | elapsed:  2.0min
+[Parallel(n_jobs=-1)]: Done 766432 tasks      | elapsed:  2.2min
+[Parallel(n_jobs=-1)]: Done 788858 out of 788858 | elapsed:  2.3min finished
+[Parallel(n_jobs=-1)]: Using backend LokyBackend with 16 concurrent workers.
+[Parallel(n_jobs=-1)]: Done  48 tasks      | elapsed:    0.1s
+[Parallel(n_jobs=-1)]: Done 512 tasks      | elapsed:    0.4s
+[Parallel(n_jobs=-1)]: Done 6112 tasks      | elapsed:    1.6s
+[Parallel(n_jobs=-1)]: Done 16480 tasks      | elapsed:    3.8s
+[Parallel(n_jobs=-1)]: Done 29152 tasks      | elapsed:    6.4s
+[Parallel(n_jobs=-1)]: Done 44128 tasks      | elapsed:    9.2s
+[Parallel(n_jobs=-1)]: Done 61408 tasks      | elapsed:   12.3s
+[Parallel(n_jobs=-1)]: Done 80992 tasks      | elapsed:   15.9s
+[Parallel(n_jobs=-1)]: Done 102880 tasks      | elapsed:   20.0s
+[Parallel(n_jobs=-1)]: Done 127072 tasks      | elapsed:   24.7s
+[Parallel(n_jobs=-1)]: Done 153568 tasks      | elapsed:   29.3s
+[Parallel(n_jobs=-1)]: Done 182368 tasks      | elapsed:   34.4s
+[Parallel(n_jobs=-1)]: Done 213472 tasks      | elapsed:   40.0s
+[Parallel(n_jobs=-1)]: Done 246880 tasks      | elapsed:   45.9s
+[Parallel(n_jobs=-1)]: Done 282592 tasks      | elapsed:   52.0s
+[Parallel(n_jobs=-1)]: Done 320608 tasks      | elapsed:   58.5s
+[Parallel(n_jobs=-1)]: Done 360928 tasks      | elapsed:  1.1min
+[Parallel(n_jobs=-1)]: Done 403552 tasks      | elapsed:  1.2min
+[Parallel(n_jobs=-1)]: Done 448480 tasks      | elapsed:  1.3min
+[Parallel(n_jobs=-1)]: Done 495712 tasks      | elapsed:  1.5min
+[Parallel(n_jobs=-1)]: Done 545248 tasks      | elapsed:  1.6min
+[Parallel(n_jobs=-1)]: Done 597088 tasks      | elapsed:  1.7min
+[Parallel(n_jobs=-1)]: Done 651232 tasks      | elapsed:  1.9min
+[Parallel(n_jobs=-1)]: Done 707680 tasks      | elapsed:  2.0min
+[Parallel(n_jobs=-1)]: Done 766432 tasks      | elapsed:  2.2min
+[Parallel(n_jobs=-1)]: Done 827488 tasks      | elapsed:  2.3min
+[Parallel(n_jobs=-1)]: Done 890848 tasks      | elapsed:  2.5min
+[Parallel(n_jobs=-1)]: Done 956512 tasks      | elapsed:  2.7min
+[Parallel(n_jobs=-1)]: Done 1024480 tasks      | elapsed:  2.8min
+[Parallel(n_jobs=-1)]: Done 1087566 out of 1087566 | elapsed:  3.0min finished
+[Parallel(n_jobs=-1)]: Using backend LokyBackend with 16 concurrent workers.
+[Parallel(n_jobs=-1)]: Done  48 tasks      | elapsed:    0.1s
+[Parallel(n_jobs=-1)]: Done 512 tasks      | elapsed:    0.4s
+[Parallel(n_jobs=-1)]: Done 6112 tasks      | elapsed:    1.5s
+[Parallel(n_jobs=-1)]: Done 16480 tasks      | elapsed:    3.8s
+[Parallel(n_jobs=-1)]: Done 29152 tasks      | elapsed:    6.2s
+[Parallel(n_jobs=-1)]: Done 44128 tasks      | elapsed:    8.6s
+[Parallel(n_jobs=-1)]: Done 61408 tasks      | elapsed:   11.1s
+[Parallel(n_jobs=-1)]: Done 80992 tasks      | elapsed:   14.1s
+[Parallel(n_jobs=-1)]: Done 102880 tasks      | elapsed:   17.6s
+[Parallel(n_jobs=-1)]: Done 127072 tasks      | elapsed:   21.4s
+[Parallel(n_jobs=-1)]: Done 153568 tasks      | elapsed:   25.3s
+[Parallel(n_jobs=-1)]: Done 182368 tasks      | elapsed:   29.5s
+[Parallel(n_jobs=-1)]: Done 213472 tasks      | elapsed:   34.5s
+[Parallel(n_jobs=-1)]: Done 246880 tasks      | elapsed:   39.6s
+[Parallel(n_jobs=-1)]: Done 282592 tasks      | elapsed:   45.0s
+[Parallel(n_jobs=-1)]: Done 320608 tasks      | elapsed:   50.8s
+[Parallel(n_jobs=-1)]: Done 360928 tasks      | elapsed:   57.0s
+[Parallel(n_jobs=-1)]: Done 403552 tasks      | elapsed:  1.1min
+[Parallel(n_jobs=-1)]: Done 448480 tasks      | elapsed:  1.2min
+[Parallel(n_jobs=-1)]: Done 495712 tasks      | elapsed:  1.3min
+[Parallel(n_jobs=-1)]: Done 545248 tasks      | elapsed:  1.4min
+[Parallel(n_jobs=-1)]: Done 597088 tasks      | elapsed:  1.6min
+[Parallel(n_jobs=-1)]: Done 651232 tasks      | elapsed:  1.7min
+[Parallel(n_jobs=-1)]: Done 707680 tasks      | elapsed:  1.8min
+[Parallel(n_jobs=-1)]: Done 766432 tasks      | elapsed:  2.0min
+[Parallel(n_jobs=-1)]: Done 797207 out of 797207 | elapsed:  2.1min finished
+[Parallel(n_jobs=-1)]: Using backend LokyBackend with 16 concurrent workers.
+[Parallel(n_jobs=-1)]: Done  48 tasks      | elapsed:    0.1s
+[Parallel(n_jobs=-1)]: Done 512 tasks      | elapsed:    0.4s
+[Parallel(n_jobs=-1)]: Done 6112 tasks      | elapsed:    1.6s
+[Parallel(n_jobs=-1)]: Done 16480 tasks      | elapsed:    3.7s
+[Parallel(n_jobs=-1)]: Done 29152 tasks      | elapsed:    6.2s
+[Parallel(n_jobs=-1)]: Done 44128 tasks      | elapsed:    8.6s
+[Parallel(n_jobs=-1)]: Done 61408 tasks      | elapsed:   11.2s
+[Parallel(n_jobs=-1)]: Done 80992 tasks      | elapsed:   14.0s
+[Parallel(n_jobs=-1)]: Done 102880 tasks      | elapsed:   17.3s
+[Parallel(n_jobs=-1)]: Done 127072 tasks      | elapsed:   21.1s
+[Parallel(n_jobs=-1)]: Done 153568 tasks      | elapsed:   25.0s
+[Parallel(n_jobs=-1)]: Done 182368 tasks      | elapsed:   29.3s
+[Parallel(n_jobs=-1)]: Done 213472 tasks      | elapsed:   33.9s
+[Parallel(n_jobs=-1)]: Done 246880 tasks      | elapsed:   39.2s
+[Parallel(n_jobs=-1)]: Done 282592 tasks      | elapsed:   44.9s
+[Parallel(n_jobs=-1)]: Done 320608 tasks      | elapsed:   50.7s
+[Parallel(n_jobs=-1)]: Done 360928 tasks      | elapsed:   56.8s
+[Parallel(n_jobs=-1)]: Done 403552 tasks      | elapsed:  1.1min
+[Parallel(n_jobs=-1)]: Done 448480 tasks      | elapsed:  1.2min
+[Parallel(n_jobs=-1)]: Done 495712 tasks      | elapsed:  1.3min
+[Parallel(n_jobs=-1)]: Done 545248 tasks      | elapsed:  1.4min
+[Parallel(n_jobs=-1)]: Done 597088 tasks      | elapsed:  1.6min
+[Parallel(n_jobs=-1)]: Done 651232 tasks      | elapsed:  1.7min
+[Parallel(n_jobs=-1)]: Done 707680 tasks      | elapsed:  1.9min
+[Parallel(n_jobs=-1)]: Done 766432 tasks      | elapsed:  2.0min
+[Parallel(n_jobs=-1)]: Done 827488 tasks      | elapsed:  2.2min
+[Parallel(n_jobs=-1)]: Done 890848 tasks      | elapsed:  2.3min
+[Parallel(n_jobs=-1)]: Done 956512 tasks      | elapsed:  2.5min
+[Parallel(n_jobs=-1)]: Done 1024480 tasks      | elapsed:  2.7min
+[Parallel(n_jobs=-1)]: Done 1030452 out of 1030452 | elapsed:  2.7min finished
+    [Stage2] PC算法骨架边数: 2526
+    [Stage2] PC算法筛选完成: 从 200 -> 149 个基因
+  [保存] /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_0_genes.csv
+         基因数: 149, 样本数: 276
+
+✅ Fold 0 完成!
+   输出文件: /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_0_genes.csv
+
+============================================================
+[Fold 1] 处理中...
+============================================================
+
+[coadread] Fold 1: 开始 Stage 2 特征精炼...
+  [数据] mRMR 基因文件: 200 基因 x 270 样本
+  [数据] 临床数据: 274 样本, OS列: survival_months
+         有效 OS 值: 274 / 274
+  [合并] 基因数据 270 样本 + 临床数据 274 样本
+         -> 合并后 274 样本 (OS + 200 基因)
+    [Depth 0] 向量化计算皮尔逊相关性矩阵...
+    [Depth 0] 向量化计算完成，处理 20100 对变量
+    [Depth 0] 正在处理 8604 条边...
+    [Depth 1] 正在处理 8604 条边...
+    [Stage2] PC算法骨架边数: 2547
+    [Stage2] PC算法筛选完成: 从 200 -> 96 个基因
+  [保存] /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_1_genes.csv
+         基因数: 96, 样本数: 274
+
+✅ Fold 1 完成!
+   输出文件: /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_1_genes.csv
+
+============================================================
+[Fold 2] 处理中...
+============================================================
+
+[coadread] Fold 2: 开始 Stage 2 特征精炼...
+  [数据] mRMR 基因文件: 200 基因 x 270 样本
+  [数据] 临床数据: 274 样本, OS列: survival_months
+         有效 OS 值: 274 / 274
+  [合并] 基因数据 270 样本 + 临床数据 274 样本
+         -> 合并后 274 样本 (OS + 200 基因)
+    [Depth 0] 向量化计算皮尔逊相关性矩阵...
+    [Depth 0] 向量化计算完成，处理 20100 对变量
+    [Depth 0] 正在处理 10166 条边...
+    [Depth 1] 正在处理 10166 条边...
+    [Stage2] PC算法骨架边数: 2436
+    [Stage2] PC算法筛选完成: 从 200 -> 42 个基因
+  [保存] /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_2_genes.csv
+         基因数: 42, 样本数: 274
+
+✅ Fold 2 完成!
+   输出文件: /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_2_genes.csv
+
+============================================================
+[Fold 3] 处理中...
+============================================================
+
+[coadread] Fold 3: 开始 Stage 2 特征精炼...
+  [数据] mRMR 基因文件: 200 基因 x 270 样本
+  [数据] 临床数据: 274 样本, OS列: survival_months
+         有效 OS 值: 274 / 274
+  [合并] 基因数据 270 样本 + 临床数据 274 样本
+         -> 合并后 274 样本 (OS + 200 基因)
+    [Depth 0] 向量化计算皮尔逊相关性矩阵...
+    [Depth 0] 向量化计算完成，处理 20100 对变量
+    [Depth 0] 正在处理 8678 条边...
+    [Depth 1] 正在处理 8678 条边...
+    [Stage2] PC算法骨架边数: 2295
+    [Stage2] PC算法筛选完成: 从 200 -> 114 个基因
+  [保存] /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_3_genes.csv
+         基因数: 114, 样本数: 274
+
+✅ Fold 3 完成!
+   输出文件: /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_3_genes.csv
+
+============================================================
+[Fold 4] 处理中...
+============================================================
+
+[coadread] Fold 4: 开始 Stage 2 特征精炼...
+  [数据] mRMR 基因文件: 200 基因 x 271 样本
+  [数据] 临床数据: 274 样本, OS列: survival_months
+         有效 OS 值: 274 / 274
+  [合并] 基因数据 271 样本 + 临床数据 274 样本
+         -> 合并后 276 样本 (OS + 200 基因)
+    [Depth 0] 向量化计算皮尔逊相关性矩阵...
+    [Depth 0] 向量化计算完成，处理 20100 对变量
+    [Depth 0] 正在处理 9935 条边...
+    [Depth 1] 正在处理 9935 条边...
+    [Stage2] PC算法骨架边数: 2495
+    [Stage2] PC算法筛选完成: 从 200 -> 77 个基因
+  [保存] /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_4_genes.csv
+         基因数: 77, 样本数: 276
+
+✅ Fold 4 完成!
+   输出文件: /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_4_genes.csv
+
+============================================================
+全部完成! 共处理 5 个 folds
+  - /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_0_genes.csv
+  - /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_1_genes.csv
+  - /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_2_genes.csv
+  - /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_3_genes.csv
+  - /root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/features/mrmr_stage2_coadread/fold_4_genes.csv
+============================================================
+
+==========================================
+✅ Stage 2 特征精炼完成!
+==========================================
+
+📁 查看结果:
+   ls -lh features/mrmr_stage2_coadread/
+
+📊 对比 mRMR vs Stage2 基因数量:
+   # mRMR 基因数
+   head -n 1 features/mrmr_coadread/fold_0_genes.csv | awk -F',' '{print NF-1}'
+
+   # Stage2 精炼后基因数
+   head -n 1 features/mrmr_stage2_coadread/fold_0_genes.csv | awk -F',' '{print NF-1}'
+==========================================

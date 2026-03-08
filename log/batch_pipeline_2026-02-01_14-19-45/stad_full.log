@@ -1,0 +1,15 @@
+   📂 生成文件:
+      features/mrmr_stad/fold_0_genes.csv
+      features/mrmr_stad/fold_1_genes.csv
+      features/mrmr_stad/fold_2_genes.csv
+      features/mrmr_stad/fold_3_genes.csv
+      features/mrmr_stad/fold_4_genes.csv
+   📂 生成文件:
+      fold_0_genes.csv: 148 个基因
+      fold_1_genes.csv: 119 个基因
+      fold_2_genes.csv: 112 个基因
+      fold_3_genes.csv: 149 个基因
+      fold_4_genes.csv: 129 个基因
+   📊 消融实验结果:
+      ⚠️  无法解析结果: No columns to parse from file
+   ⏱️  耗时: 45分42秒

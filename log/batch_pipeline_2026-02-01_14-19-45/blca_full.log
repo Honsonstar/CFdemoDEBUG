@@ -1,0 +1,18 @@
+   📂 生成文件:
+      features/mrmr_blca/fold_0_genes.csv
+      features/mrmr_blca/fold_1_genes.csv
+      features/mrmr_blca/fold_2_genes.csv
+      features/mrmr_blca/fold_3_genes.csv
+      features/mrmr_blca/fold_4_genes.csv
+   📂 生成文件:
+      fold_0_genes.csv: 187 个基因
+      fold_1_genes.csv: 192 个基因
+      fold_2_genes.csv: 194 个基因
+      fold_3_genes.csv: 181 个基因
+      fold_4_genes.csv: 184 个基因
+   📊 消融实验结果:
+      Gene Only:  0.6447
+      Text Only:  0.6251
+      Fusion:     0.6764
+      提升: +4.92%
+   ⏱️  耗时: 49分53秒

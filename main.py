@@ -21,6 +21,9 @@ def main(args):
     }
 
     for i in folds:
+        # 设置当前 fold 索引，供模型初始化使用
+        args.k = i
+
         # 路径处理
         nested_csv = '{}/nested_splits_{}.csv'.format(args.split_dir, i)
         std_csv = '{}/splits_{}.csv'.format(args.split_dir, i)

@@ -1,0 +1,15 @@
+   📂 生成文件:
+      features/mrmr_hnsc/fold_0_genes.csv
+      features/mrmr_hnsc/fold_1_genes.csv
+      features/mrmr_hnsc/fold_2_genes.csv
+      features/mrmr_hnsc/fold_3_genes.csv
+      features/mrmr_hnsc/fold_4_genes.csv
+   📂 生成文件:
+      fold_0_genes.csv: 170 个基因
+      fold_1_genes.csv: 150 个基因
+      fold_2_genes.csv: 133 个基因
+      fold_3_genes.csv: 146 个基因
+      fold_4_genes.csv: 148 个基因
+   📊 消融实验结果:
+      ⚠️  无法解析结果: No columns to parse from file
+   ⏱️  耗时: 40分47秒

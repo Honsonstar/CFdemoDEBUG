@@ -1,8 +1,23 @@
 #!/bin/bash
 
 # ====================================================================
-# 多模态消融实验脚本（并行优化版）
+# 多模态消融实验脚本（CGI版）
+# 使用 CGI 重新划分的交叉验证和筛选的基因特征
 # 对比 Gene Only、Text Only、Fusion 三种模式的性能
+# ====================================================================
+#
+# 运行方法:
+#   bash scripts/run_ablation_study.sh coadread
+#
+# 前置要求:
+#   1. 运行 preprocess_test.py 生成 CGI 数据和划分
+#   2. 运行 CGI 算法筛选基因
+#   3. 运行 extract_features.py 生成基因特征文件
+#
+# 数据路径:
+#   - 划分文件: splits/CGI_nested_cv/{cancer}/
+#   - 基因特征: preprocessing/CGI/data/{cancer}_found_genes/*.csv
+#
 # ====================================================================
 
 # 检查参数
@@ -24,12 +39,13 @@ TODAY=$(date +%Y-%m-%d)
 # 临床标签文件: 包含患者生存信息、文本报告等
 LABEL_FILE="datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv"
 
-# 交叉验证划分文件: 5折嵌套交叉验证的划分
-SPLIT_DIR="splits/nested_cv/${STUDY}"
+# 交叉验证划分文件: 5折嵌套交叉验证的划分（使用CGI重新划分的版本）
+SPLIT_DIR="splits/CGI_nested_cv/${STUDY}"
 
-# CPCG基因特征文件: CPCG筛选的各折基因特征（嵌套CV需要各折独立特征）
-# 路径格式: features/${STUDY}/fold_${fold}_genes.csv
-FEATURE_DIR="features/${STUDY}"
+# CGI筛选的基因特征文件: CGI筛选的各折基因特征
+# 路径格式: preprocessing/CGI/data/${STUDY}_found_genes/${STUDY}_found_Genes_fold${fold}.csv
+FEATURE_DIR="preprocessing/CGI/data/${STUDY}_found_genes"
+FEATURE_FILE="${STUDY}_found_Genes_fold"
 
 # RNA原始数据: 用于加载完整的RNA表达数据（备选）
 OMICS_DIR="datasets_csv/raw_rna_data/combine/${STUDY}"
@@ -92,13 +108,13 @@ export LABEL_FILE      # 导出标签文件路径（供Python使用）
 export SPLIT_DIR       # 导出划分文件路径（供Python使用）
 export ABLRESULTS_DIR  # 导出结果目录路径（供Python使用）
 
-# 【新增】检查特征文件是否存在
+# 【新增】检查CGI特征文件是否存在
 check_features() {
     local study=$1
     local all_exist=true
-    echo "🔍 检查 ${study^^} 的 CPCG 特征文件..."
+    echo "🔍 检查 ${study^^} 的 CGI 基因特征文件..."
     for fold in $(seq 0 $((K_FOLDS-1))); do
-        local file="${FEATURE_DIR}/fold_${fold}_genes.csv"
+        local file="${FEATURE_DIR}/${FEATURE_FILE}${fold}.csv"
         if [ -f "$file" ]; then
             echo "   ✓ Fold ${fold}: $(basename $file) 存在"
         else
@@ -108,16 +124,17 @@ check_features() {
     done
     if [ "$all_exist" = false ]; then
         echo "❌ 错误: ${study} 特征文件不完整，跳过训练"
+        echo "请先运行: python3 preprocessing/CGI/extract_features.py"
         return 1
     fi
-    echo "✅ ${study} 特征文件检查通过"
+    echo "✅ ${study} CGI 特征文件检查通过"
     return 0
 }
 
 # 检查必要文件
 if [ ! -d "${SPLIT_DIR}" ]; then
     echo "❌ 错误: 找不到划分文件目录 ${SPLIT_DIR}"
-    echo "请先运行: bash create_nested_splits.sh ${STUDY}"
+    echo "请先运行: python3 preprocessing/CGI/preprocess_test.py"
     exit 1
 fi
 
