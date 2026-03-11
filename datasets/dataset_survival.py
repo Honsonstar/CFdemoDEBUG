@@ -342,9 +342,17 @@ class SurvivalDatasetFactory:
             - uncensored_df : pd.DataFrame
             
         """
+        ##3.8，测试使用全部样本会怎样
+        # if 'oncotree_code' in self.label_data.columns and "IDC" in self.label_data['oncotree_code'].values: # must be BRCA (and if so, use only IDCs)
+        #     self.label_data = self.label_data[self.label_data['oncotree_code'] == 'IDC']
 
-        if 'oncotree_code' in self.label_data.columns and "IDC" in self.label_data['oncotree_code'].values: # must be BRCA (and if so, use only IDCs)
-            self.label_data = self.label_data[self.label_data['oncotree_code'] == 'IDC']
+        # 填充虚拟slide_id（供不使用图像的模型使用）
+        if 'slide_id' in self.label_data.columns:
+            self.label_data['slide_id'] = self.label_data['slide_id'].fillna('dummy_slide')
+
+        # 过滤掉没有survival_months的样本（这些样本无法用于训练）
+        if self.label_col in self.label_data.columns:
+            self.label_data = self.label_data[self.label_data[self.label_col].notna()]
 
         # Filter out samples without stage information if multitask is enabled
         if self.enable_multitask:

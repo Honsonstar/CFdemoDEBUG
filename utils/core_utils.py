@@ -688,17 +688,19 @@ def _process_data_and_forward(model, modality, device, data, enable_multitask=Fa
 
 def _calculate_risk(h):
     r"""
-    Take the logits of the model and calculate the risk for the patient 
-    
-    Args: 
-        - h : torch.Tensor 
-    
+    Take the logits of the model and calculate the risk for the patient
+
+    Args:
+        - h : torch.Tensor
+
     Returns:
-        - risk : torch.Tensor 
-    
+        - risk : torch.Tensor
+
     """
     hazards = torch.sigmoid(h)
     survival = torch.cumprod(1 - hazards, dim=1)
+    # 修复：确保 risk 越大表示风险越高
+    # survival 越小（预期生存时间短）→ -sum(survival) 越大 → 风险越高
     risk = -torch.sum(survival, dim=1).detach().cpu().numpy()
     return risk, survival.detach().cpu().numpy()
 
@@ -944,7 +946,7 @@ def _calculate_metrics(loader, dataset_factory, survival_train, all_risk_scores,
     bins_original = dataset_factory.bins
     which_times_to_eval_at = np.array([data.min() + 0.0001, bins_original[1], bins_original[2], data.max() - 0.0001])
 
-    #---> delete the nans and corresponding elements from other arrays 
+    #---> delete the nans and corresponding elements from other arrays
     original_risk_scores = all_risk_scores
     all_risk_scores = np.delete(all_risk_scores, np.argwhere(np.isnan(original_risk_scores)))
     all_censorships = np.delete(all_censorships, np.argwhere(np.isnan(original_risk_scores)))
