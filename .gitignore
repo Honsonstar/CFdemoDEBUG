@@ -1,14 +1,51 @@
+# ====================
+# 模型权重 (不追踪)
+# ====================
 *.bin
 *.pth
 *.pt
-*.csv
-datasets_csv/
+*.ckpt
+*.h5
+*.hdf5
 biobert/
-results/
-__pycache__/
-.DS_Store
 
-# 可视化文件
+# ====================
+# 原始数据 (不追踪)
+# ====================
+datasets_csv/
+*.csv
+
+# ====================
+# 预处理数据与中间文件 (不追踪)
+# ====================
+preprocessing/CGI/data/
+preprocessing/CPCG_algo/raw_data/
+splits/
+features/
+hypergraph_cache/
+graph_data.pkl
+
+# ====================
+# 训练结果与日志 (不追踪)
+# ====================
+results/
+log/
+*.log
+explanation_results/
+
+# ====================
+# 缓存与临时文件 (不追踪)
+# ====================
+__pycache__/
+*.pyc
+*.pyo
+.hypothesis/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ====================
+# 可视化与文档 (不追踪)
+# ====================
 *.png
 *.jpg
 *.jpeg
@@ -21,3 +58,25 @@ __pycache__/
 *.webp
 *.html
 *.htm
+*.md
+
+# ====================
+# 系统文件 (不追踪)
+# ====================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.bashrc
+custom_optims/
+debug_*.py
+QUICK_REFERENCE.md
+PARALLEL_*.md
+CPCG_*.md
+PROJECT_*.md
+SCRIPT_*.md
+*_SUMMARY.md
+*_REPORT.md

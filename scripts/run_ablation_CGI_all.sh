@@ -236,15 +236,16 @@ EOF
 run_single_cancer() {
     local study=$1
     local today=$2
+    local main_log=$3
 
-    echo ""
-    echo "################################################################"
-    echo "### 开始处理癌症类型: ${study^^}"
+    echo "" | tee -a "${main_log}"
+    echo "################################################################" | tee -a "${main_log}"
+    echo "### 开始处理癌症类型: ${study^^}" | tee -a "${main_log}"
     echo "################################################################"
 
     # 检查特征文件
     if ! check_features $study; then
-        echo "❌ 跳过 ${study}，特征文件缺失"
+        echo "❌ 跳过 ${study}，特征文件缺失" | tee -a "${main_log}"
         return 1
     fi
 
@@ -254,12 +255,10 @@ run_single_cancer() {
     # 创建目录
     mkdir -p "${log_dir}" "report" "${results_dir}"/{text,gene,fusion}
 
-    local main_log="${log_dir}/ablation_all.log"
-
-    echo "🚀 开始完整消融实验: ${study}"
-    echo "📅 日期: ${today}"
-    echo "📁 日志: ${main_log}"
-    echo "=============================================="
+    echo "🚀 开始完整消融实验: ${study}" | tee -a "${main_log}"
+    echo "📅 日期: ${today}" | tee -a "${main_log}"
+    echo "📁 日志: ${main_log}" | tee -a "${main_log}"
+    echo "==============================================" | tee -a "${main_log}"
 
     # ==================== 1. Text Only ====================
     local text_log="${results_dir}/text_training.log"
@@ -336,13 +335,14 @@ print(f"\n📁 结果: {final_csv}")
 print("="*60)
 EOF
 
-    echo ""
-    echo "✅ ${study} 消融实验完成！"
+    echo "" | tee -a "${main_log}"
+    echo "✅ ${study} 消融实验完成！" | tee -a "${main_log}"
 }
 
 # ==================== 主程序 ====================
 
 TODAY=$(date +%Y-%m-%d)
+LOG_DIR="log/${TODAY}"
 
 # 检查参数 - 如果没有参数则运行所有癌症种类
 if [ -z "$1" ]; then
@@ -353,10 +353,10 @@ else
     CANCERS_TO_RUN=("$@")
 fi
 
-echo "🚀 开始完整消融实验"
-echo "📅 日期: ${TODAY}"
-echo "📋 癌症种类: ${CANCERS_TO_RUN[*]}"
-echo "=============================================="
+echo "🚀 开始完整消融实验" | tee -a "${LOG_DIR}/ablation_all.log"
+echo "📅 日期: ${TODAY}" | tee -a "${LOG_DIR}/ablation_all.log"
+echo "📋 癌症种类: ${CANCERS_TO_RUN[*]}" | tee -a "${LOG_DIR}/ablation_all.log"
+echo "==============================================" | tee -a "${LOG_DIR}/ablation_all.log"
 
 # 验证癌症种类
 for study in "${CANCERS_TO_RUN[@]}"; do
@@ -375,8 +375,10 @@ for study in "${CANCERS_TO_RUN[@]}"; do
 done
 
 # 运行每种癌症
+LOG_DIR="log/${TODAY}"
 for study in "${CANCERS_TO_RUN[@]}"; do
-    run_single_cancer $study $TODAY
+    MAIN_LOG="${LOG_DIR}/${study}/ablation_all.log"
+    run_single_cancer $study $TODAY "${MAIN_LOG}"
 done
 
 echo ""
@@ -385,3 +387,11 @@ echo "### ✅ 所有癌症种类消融实验完成！"
 echo "################################################################"
 echo "📁 结果目录: results/ablation/"
 echo "📋 报告目录: report/"
+
+# 保存完整日志
+echo ""
+echo "################################################################"
+echo "### ✅ 所有癌症种类消融实验完成！" | tee -a "${LOG_DIR}/ablation_all.log"
+echo "################################################################" | tee -a "${LOG_DIR}/ablation_all.log"
+echo "📁 结果目录: results/ablation/" | tee -a "${LOG_DIR}/ablation_all.log"
+echo "📋 报告目录: report/" | tee -a "${LOG_DIR}/ablation_all.log"
