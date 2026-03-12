@@ -13,6 +13,18 @@ warnings.filterwarnings("ignore")
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def main(args):
+    # 【修复】仅文本模式时强制禁用基因特征
+    if hasattr(args, 'ab_model') and args.ab_model == 1:
+        print("🔧 [Fix] 仅文本模式 (ab_model=1)，强制禁用基因特征")
+        # 强制将基因维度设置为0
+        if hasattr(args, 'nested_cv_omic_dim') and args.nested_cv_omic_dim:
+            for fold in args.nested_cv_omic_dim:
+                args.nested_cv_omic_dim[fold] = 0
+            print(f"   - nested_cv_omic_dim 设置为: {args.nested_cv_omic_dim}")
+        if hasattr(args, 'omic_sizes') and args.omic_sizes:
+            args.omic_sizes = [0]
+            print(f"   - omic_sizes 设置为: {args.omic_sizes}")
+
     folds = _get_start_end(args)
     
     # 存储结果

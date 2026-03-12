@@ -14,8 +14,16 @@
 #   1. 运行 preprocess_test.py 生成 CGI 数据和划分
 #   2. 运行 CGI 算法筛选基因
 #   3. 运行 extract_features.py 生成基因特征文件
+#   4. 需要在 causal conda 环境中运行
 #
 # ====================================================================
+
+# 自动激活 conda 环境
+if command -v conda &> /dev/null; then
+    source /root/miniconda3/etc/profile.d/conda.sh
+    conda activate causal
+    echo "✅ 已激活 causal 环境"
+fi
 
 # 癌症种类列表
 ALL_CANCERS=("brca" "blca" "hnsc" "stad" "coadread")

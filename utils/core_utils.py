@@ -529,7 +529,7 @@ def _extract_survival_metadata(train_loader, val_loader):
     all_survival = Surv.from_arrays(event=(1-all_censorships).astype(bool), time=all_event_times)
     return all_survival
 
-def _unpack_data(modality, device, data, enable_multitask=False):
+def _unpack_data(modality, device, data, enable_multitask=False, ab_model=None):
     r"""
     Depending on the model type, unpack the data and put it on the correct device
     
@@ -620,22 +620,31 @@ def _unpack_data(modality, device, data, enable_multitask=False):
         
     else:
         raise ValueError('Unsupported modality:', modality)
-    
+
+    # 【修复】仅文本模式时，将基因特征置零以避免数据泄露
+    if ab_model == 1:
+        import torch
+        if isinstance(data_omics, list):
+            data_omics = [torch.zeros_like(x) for x in data_omics]
+        else:
+            data_omics = torch.zeros_like(data_omics)
+
     y_disc, event_time, censor = y_disc.to(device), event_time.to(device), censor.to(device)
 
     return data_WSI, mask, y_disc, event_time, censor, data_omics, clinical_data_list, mask, stage_labels
 
-def _process_data_and_forward(model, modality, device, data, enable_multitask=False):
+def _process_data_and_forward(model, modality, device, data, enable_multitask=False, ab_model=None):
     r"""
-    Depeding on the modality, process the input data and do a forward pass on the model 
-    
+    Depeding on the modality, process the input data and do a forward pass on the model
+
     Args:
         - model : Pytorch model
         - modality : String
         - device : torch.device
         - data : tuple
         - enable_multitask : Boolean
-    
+        - ab_model : Integer (1=仅文本, 2=仅基因, 3=融合)
+
     Returns:
         - out : torch.Tensor or tuple
         - y_disc : torch.Tensor
@@ -643,10 +652,10 @@ def _process_data_and_forward(model, modality, device, data, enable_multitask=Fa
         - censor : torch.Tensor
         - clinical_data_list : List
         - stage_labels : torch.Tensor (if multitask enabled)
-    
+
     """
     data_WSI, mask, y_disc, event_time, censor, data_omics, clinical_data_list, mask, stage_labels = _unpack_data(
-        modality, device, data, enable_multitask)
+        modality, device, data, enable_multitask, ab_model)
 
     if modality in ["coattn", "coattn_motcat"]:  
         
@@ -744,7 +753,7 @@ def _update_arrays(all_risk_scores, all_censorships, all_event_times, all_clinic
     
     return all_risk_scores, all_censorships, all_event_times, all_clinical_data
 
-def _train_loop_survival(epoch, model, modality, loader, optimizer, scheduler, loss_fn, enable_multitask=False, use_debiase=True, use_align=False):
+def _train_loop_survival(epoch, model, modality, loader, optimizer, scheduler, loss_fn, enable_multitask=False, use_debiase=True, use_align=False, ab_model=None):
     r"""
     Perform one epoch of training
 
@@ -756,6 +765,7 @@ def _train_loop_survival(epoch, model, modality, loader, optimizer, scheduler, l
         - optimizer : torch.optim
         - loss_fn : custom loss function class
         - enable_multitask : Boolean
+        - ab_model : Integer (1=仅文本, 2=仅基因, 3=融合)
 
     Returns:
         - c_index : Float
@@ -797,12 +807,12 @@ def _train_loop_survival(epoch, model, modality, loader, optimizer, scheduler, l
 
     # one epoch
     for batch_idx, data in enumerate(loader):
-        
+
         optimizer.zero_grad()
 
         if enable_multitask:
             output, y_disc, event_time, censor, clinical_data_list, stage_labels = _process_data_and_forward(
-                model, modality, device, data, enable_multitask)
+                model, modality, device, data, enable_multitask, ab_model)
             # 【修改】训练时忽略explanation_data（不需要保存）
             if use_debiase:
                 if use_align:
@@ -850,7 +860,7 @@ def _train_loop_survival(epoch, model, modality, loader, optimizer, scheduler, l
 
         else:
             output, y_disc, event_time, censor, clinical_data_list = _process_data_and_forward(
-                model, modality, device, data, enable_multitask)
+                model, modality, device, data, enable_multitask, ab_model)
             # 【修改】训练时忽略explanation_data（不需要保存）
             if use_debiase:
                 if use_align:
@@ -993,7 +1003,7 @@ def _calculate_metrics(loader, dataset_factory, survival_train, all_risk_scores,
     
     return c_index, c_index_ipcw, BS, IBS, iauc
 
-def _summary(dataset_factory, model, modality, loader, loss_fn, survival_train=None, enable_multitask=False, use_debiase=True, use_align=False, save_visualizations=True, dataset_name=None, fold_idx=None):
+def _summary(dataset_factory, model, modality, loader, loss_fn, survival_train=None, enable_multitask=False, use_debiase=True, use_align=False, save_visualizations=True, dataset_name=None, fold_idx=None, ab_model=None):
     r"""
     Run a validation loop on the trained model
 
@@ -1064,7 +1074,7 @@ def _summary(dataset_factory, model, modality, loader, loss_fn, survival_train=N
 
             if enable_multitask:
                 data_WSI, mask, y_disc, event_time, censor, data_omics, clinical_data_list, mask, stage_labels = _unpack_data(
-                    modality, device, data, enable_multitask)
+                    modality, device, data, enable_multitask, ab_model)
 
                 if modality in ["coattn", "coattn_motcat"]:  
                     output = model(
@@ -1145,7 +1155,7 @@ def _summary(dataset_factory, model, modality, loader, loss_fn, survival_train=N
                                                     dataset_name=dataset_name, fold_idx=fold_idx)
             else:
                 data_WSI, mask, y_disc, event_time, censor, data_omics, clinical_data_list, mask, _ = _unpack_data(
-                    modality, device, data, enable_multitask)
+                    modality, device, data, enable_multitask, ab_model)
 
                 if modality in ["coattn", "coattn_motcat"]:  
                     h = model(
@@ -1284,46 +1294,36 @@ def _get_lr_scheduler(args, optimizer, dataloader):
 def _step(cur, args, loss_fn, model, optimizer, scheduler, train_loader, val_loader):
     r"""
     Trains the model for the set number of epochs and validates it.
-    
+
     Args:
         - cur
         - args
         - loss_fn
         - model
         - optimizer
-        - lr scheduler 
-        - train_loader
-        - val_loader
-        
-    Returns:
-        - results_dict : dictionary
-        - val_cindex : Float
-        - val_cindex_ipcw  : Float
-        - val_BS : List
-        - val_IBS : Float
-        - val_iauc : Float
-        - total_loss : Float
-        - val_stage_accuracy : Float (if multitask enabled)
+        - lr scheduler
     """
+    # 获取 ab_model 参数
+    ab_model = getattr(args, 'ab_model', None)
 
     all_survival = _extract_survival_metadata(train_loader, val_loader)
     best_c_index = 0.0
     best_model_path = os.path.join(args.results_dir, f'best_model_fold_{cur}.pth')
-    
+
     for epoch in range(args.max_epochs):
         if args.enable_multitask:
-            _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, args.enable_multitask)
+            _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, args.enable_multitask, ab_model=ab_model)
         else:
-            _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn)
+            _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, ab_model=ab_model)
 
         if args.enable_multitask:
             results_dict, val_cindex, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss, val_stage_accuracy = _summary(
-                args.dataset_factory, model, args.modality, val_loader, loss_fn, all_survival, args.enable_multitask)
+                args.dataset_factory, model, args.modality, val_loader, loss_fn, all_survival, args.enable_multitask, ab_model=ab_model)
             # if val_cindex > best_c_index and best_c_index < 1.0:
             #     best_c_index = val_cindex
         else:
             results_dict, val_cindex, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss, val_stage_accuracy = _summary(
-                args.dataset_factory, model, args.modality, val_loader, loss_fn, all_survival, args.enable_multitask)
+                args.dataset_factory, model, args.modality, val_loader, loss_fn, all_survival, args.enable_multitask, ab_model=ab_model)
         if val_cindex > best_c_index and best_c_index < 1.0:
             best_c_index = val_cindex
             # torch.save({
@@ -1388,6 +1388,9 @@ def _step_with_train_test_results(cur, args, loss_fn, model, optimizer, schedule
     """
     修改后的_step函数，同时获取训练集和测试集结果
     """
+    # 获取 ab_model 参数
+    ab_model = getattr(args, 'ab_model', None)
+
     all_survival = _extract_survival_metadata(train_loader, val_loader)
     # 【修改】初始值从0.0改为-1.0，确保第一个epoch能保存结果
     best_c_index = -1.0
@@ -1400,12 +1403,12 @@ def _step_with_train_test_results(cur, args, loss_fn, model, optimizer, schedule
 
     for epoch in range(args.max_epochs):
         # 训练
-        _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, args.enable_multitask)
+        _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, args.enable_multitask, ab_model=ab_model)
 
         # 【修改】在测试集上评估，传递dataset_name和fold_idx
         results_dict, val_cindex, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss, val_stage_accuracy = _summary(
             args.dataset_factory, model, args.modality, val_loader, loss_fn, all_survival, args.enable_multitask,
-            save_visualizations=True, dataset_name=dataset_name, fold_idx=cur)
+            save_visualizations=True, dataset_name=dataset_name, fold_idx=cur, ab_model=ab_model)
 
         # 【修改】第一个epoch或val_cindex更大时强制保存
         if epoch == 0 or val_cindex > best_c_index:
@@ -1417,7 +1420,7 @@ def _step_with_train_test_results(cur, args, loss_fn, model, optimizer, schedule
             train_results_dict, _, _, _, _, _, _, _ = _summary(
                 args.dataset_factory, model, args.modality, train_loader, loss_fn, all_survival, args.enable_multitask,
                 use_debiase=True, use_align=False, save_visualizations=False,
-                dataset_name=dataset_name, fold_idx=cur)
+                dataset_name=dataset_name, fold_idx=cur, ab_model=ab_model)
             best_train_results = train_results_dict.copy()
             
             # 保存模型
