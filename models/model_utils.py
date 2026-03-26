@@ -79,7 +79,8 @@ class BilinearFusion(nn.Module):
 
 def SNN_Block(dim1, dim2, dropout=0.25):
     r"""
-    Multilayer Reception Block w/ Self-Normalization (Linear + ELU + Alpha Dropout)
+    Robust Feedforward Block with LayerNorm + GELU
+    Prevents gradient vanishing/exploding and mode collapse in low-dimensional settings
 
     args:
         dim1 (int): Dimension of input features
@@ -90,8 +91,9 @@ def SNN_Block(dim1, dim2, dropout=0.25):
 
     return nn.Sequential(
             nn.Linear(dim1, dim2),
-            nn.ELU(),
-            nn.AlphaDropout(p=dropout, inplace=False))
+            nn.LayerNorm(dim2),
+            nn.GELU(),
+            nn.Dropout(p=dropout))
 
 
 def Reg_Block(dim1, dim2, dropout=0.25):

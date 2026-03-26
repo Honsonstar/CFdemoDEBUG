@@ -113,7 +113,7 @@ for study in $STUDIES; do
         
         # 显示生成的文件
         echo "   📂 生成文件:" | tee -a "${STUDY_LOG}"
-        ls -lh features/mrmr_${study}/fold_*.csv 2>/dev/null | awk '{print "      " $9}' | tee -a "${STUDY_LOG}"
+        ls -lh features/mrmr_${study}/fold_*_genes.csv 2>/dev/null | awk '{print "      " $9}' | tee -a "${STUDY_LOG}"
     else
         log_step "$study" "mRMR特征选择" "失败"
         echo "   ⚠️  详见日志: ${MRMR_LOG}" | tee -a "${STUDY_LOG}"

@@ -370,7 +370,7 @@ class GatedFusion(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.1),
             nn.Linear(feature_dim, num_modalities),
-            nn.Softmax(dim=1)  # 确保权重和为1
+            nn.Sigmoid()  # 每个模态独立决定权重，允许多模态同时保持高激活
         )
 
         # 【已改】融合后的特征投影
@@ -420,6 +420,26 @@ class GatedFusion(nn.Module):
         output = self.fusion_projection(fused)  # [batch_size, feature_dim]
 
         return output, final_weights
+
+
+class FeatureGating(nn.Module):
+    """
+    针对 100+ 高维不稳定基因特征的动态软掩码门控
+    """
+    def __init__(self, input_dim):
+        super().__init__()
+        self.gate = nn.Sequential(
+            nn.Linear(input_dim, max(32, input_dim // 2)),
+            nn.SELU(),
+            nn.Linear(max(32, input_dim // 2), input_dim),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        # x shape: [Batch, input_dim]
+        attention_weights = self.gate(x)
+        return x * attention_weights
+
 
 class SNNOmics(nn.Module):
     def __init__(self, omic_input_dim: int, model_size_omic: str='small', n_classes: int=4,
@@ -542,10 +562,35 @@ class SNNOmics(nn.Module):
         
         
 
-        fc_omic = [SNN_Block(dim1=omic_input_dim, dim2=hidden[0])]
-        for i, _ in enumerate(hidden[1:]):
-            fc_omic.append(SNN_Block(dim1=hidden[i], dim2=hidden[i+1], dropout=0.25))
+        # 构建动态的 Genomic SNN 网络
+        fc_omic = []
+        target_dim = hidden[-1]  # 通常为 256
+
+        # 针对输入维度的不同范围，设计平滑的过渡层 (Buffer Layers)
+        if omic_input_dim <= 64:
+            # 极低维因果特征：使用窄漏斗防止严重过拟合
+            fc_omic.append(SNN_Block(dim1=omic_input_dim, dim2=32, dropout=0.1))
+            fc_omic.append(SNN_Block(dim1=32, dim2=target_dim, dropout=0.25))
+
+        elif omic_input_dim < target_dim:
+            # 100+ 的中等维度特征 (如 105, 140 等)：使用 128 维作为平滑过渡
+            # 这样既不会丢失 100+ 基因的信息，也不会一步到位升维到 256 放大噪声
+            mid_dim = 128
+            # 在输入端应用较低的 dropout 容忍不稳定的特征波动
+            fc_omic.append(SNN_Block(dim1=omic_input_dim, dim2=mid_dim, dropout=0.15))
+            fc_omic.append(SNN_Block(dim1=mid_dim, dim2=target_dim, dropout=0.25))
+
+        else:
+            # 兼容未筛选的高维全集 (如原始的 4999 维或 1024 维)
+            fc_omic.append(SNN_Block(dim1=omic_input_dim, dim2=hidden[0], dropout=0.25))
+            for i, _ in enumerate(hidden[1:]):
+                fc_omic.append(SNN_Block(dim1=hidden[i], dim2=hidden[i+1], dropout=0.25))
+
         self.fc_omic = nn.Sequential(*fc_omic)
+
+        # 【新增】防守型表征学习模块
+        self.feature_gating = FeatureGating(input_dim=omic_input_dim)
+        self.gene_fusion_dropout = nn.Dropout(p=0.3)
         
         # 【修复】根据运行模式初始化survival_classifier
         if self.ab_model == 1:  # 仅文本模式
@@ -565,8 +610,8 @@ class SNNOmics(nn.Module):
                 # 通路模式：Gene(256) + Cross(256) + Text(768) = 1280维
                 self.survival_classifier = nn.Linear(1280, n_classes)
             else:
-                # 无通路模式：Gene(256) + Text(768) = 1024维
-                self.survival_classifier = nn.Linear(1024, n_classes)
+                # 无通路模式：使用门控融合 (256维)，不再直接拼接
+                self.survival_classifier = nn.Linear(self.target_dim, n_classes)
             self.only_text = False
         self.text_classifier = nn.Linear(self.target_dim, n_classes)
         self.gene_classifier = nn.Linear(hidden[-1], n_classes)
@@ -583,11 +628,20 @@ class SNNOmics(nn.Module):
             elif self.ab_model == 2:  # 仅基因模式
                 self.stage_classifier = nn.Linear(hidden[-1], n_stage_classes)
             else:  # 多模态融合模式 (ab_model == 3)
-                self.stage_classifier = nn.Sequential(
-                    nn.Linear(hidden[-1] + 768, hidden[-1]),
-                    nn.ReLU(),
-                    nn.Linear(hidden[-1], n_stage_classes)
-                )
+                if self.use_pathway:
+                    # 通路模式：Gene + Text 拼接
+                    self.stage_classifier = nn.Sequential(
+                        nn.Linear(hidden[-1] + 768, hidden[-1]),
+                        nn.ReLU(),
+                        nn.Linear(hidden[-1], n_stage_classes)
+                    )
+                else:
+                    # 无通路模式：使用门控融合 (256维)
+                    self.stage_classifier = nn.Sequential(
+                        nn.Linear(self.target_dim, self.target_dim // 2),
+                        nn.ReLU(),
+                        nn.Linear(self.target_dim // 2, n_stage_classes)
+                    )
             self.stage_classifier_text = nn.Linear(768, n_stage_classes)
 
         self.constant = nn.Parameter(torch.tensor(0.0), requires_grad=True)
@@ -930,8 +984,17 @@ class SNNOmics(nn.Module):
     #主要修改的地方
     def forward(self, return_feats=False, **kwargs):
         # 【基因级别的表征 ， 通路级别的表征， 文本级别的表征】
-        x = kwargs['data_omics']#基因数据
-        gene_level_rep = self.fc_omic(x) # 1.基因级别的表征 [1, dim]，使用全连接层堆叠
+        x = kwargs['data_omics'] # 基因数据 [Batch, omic_input_dim]
+
+        # [策略1] FeatureGating：动态噪声过滤，压制不稳定基因
+        x_gated = self.feature_gating(x)
+
+        # 1. 基因级别的表征 [Batch, dim]
+        gene_level_rep = self.fc_omic(x_gated)
+
+        # [策略2] 显式 Input Dropout：在进入多模态融合前，随机掩码部分基因表征，
+        # 迫使后续的 GatedFusion / CrossAttention 不敢"死磕"不稳定的基因分支，增强对文本特征的依赖
+        gene_level_rep = self.gene_fusion_dropout(gene_level_rep)
         # print('gene_level_rep.shape:', gene_level_rep.shape)
 
         #修改通路逻辑，到后面。
@@ -956,7 +1019,8 @@ class SNNOmics(nn.Module):
         use_pathway = getattr(self, 'use_pathway', True) # 默认 True 以兼容旧代码
 
         if use_pathway:
-            pathway_level_rep = self.pathway_encoder(x) 
+            # 如果开启了超图通路，也让超图接收过滤后的高质量信号
+            pathway_level_rep = self.pathway_encoder(x_gated) 
             
             # 投影文本特征用于 Attention
             text_emb_proj = self.text_projection(text_embeddings) 
@@ -973,10 +1037,15 @@ class SNNOmics(nn.Module):
             # 原有的拼接逻辑 (Gene + Cross + Text)
             cat_embeddings = torch.cat([gene_level_rep, cross_modal_rep, text_embeddings], dim=1)
         else:
-            # === 新模式：直接拼接 ===
-            # Gene(256) + Text(768) = 1024 维
-            cat_embeddings = torch.cat([gene_level_rep, text_embeddings], dim=1)
-            
+            # === 修复的多模态融合：带残差的独立门控 ===
+            text_emb_proj = self.text_projection(text_embeddings)  # 768 -> 256
+
+            # 使用 Sigmoid 门控融合
+            fused_embeddings, survival_gate_weights = self.gated_fusion_survival([gene_level_rep, text_emb_proj])
+
+            # 引入文本特征的残差连接（Residual Connection），确保即使融合权重坍缩，文本的基线性能也不会丢失
+            cat_embeddings = fused_embeddings + text_emb_proj
+
             # 设置空的 attention weights 防止后面报错
             attn_weights = None
 
@@ -1077,8 +1146,11 @@ class SNNOmics(nn.Module):
                 # 多模态：基因 + 交叉注意力 + 文本
                 cat_embeddings = torch.cat([gene_level_rep, cross_modal_rep, text_embeddings], dim=1)
             else:
-                # 多模态：基因 + 文本
-                cat_embeddings = torch.cat([gene_level_rep, text_embeddings], dim=1)
+                # 多模态：基因 + 文本，使用门控融合 + 残差连接
+                text_emb_proj = self.text_projection(text_embeddings)  # 768 -> 256
+                fused_embeddings, _ = self.gated_fusion_survival([gene_level_rep, text_emb_proj])
+                # 引入文本特征的残差连接
+                cat_embeddings = fused_embeddings + text_emb_proj
             # 仅在第一个batch打印，避免日志刷屏
             if not hasattr(self, '_print_debug'):
                 print(f"[Debug] 多模态模式: cat_embeddings shape = {cat_embeddings.shape}")
@@ -1115,7 +1187,13 @@ class SNNOmics(nn.Module):
                 stage_input = gene_level_rep
                 print(f"[Debug] 仅基因模式(Stage): stage_input shape = {stage_input.shape}")
             else:  # 多模态融合模式 (ab_model == 3)
-                stage_input = torch.cat((gene_level_rep, text_embeddings), dim=1)
+                if self.use_pathway:
+                    stage_input = torch.cat((gene_level_rep, text_embeddings), dim=1)
+                else:
+                    # 无通路模式：使用门控融合 + 残差连接
+                    text_emb_proj = self.text_projection(text_embeddings)
+                    fused_stage, _ = self.gated_fusion_stage([gene_level_rep, text_emb_proj])
+                    stage_input = fused_stage + text_emb_proj
                 print(f"[Debug] 多模态模式(Stage): stage_input shape = {stage_input.shape}")
 
             # 输入进分类器

@@ -192,39 +192,47 @@ class Stage2Refiner:
         self.study = study
         self.clinical_dir = clinical_dir
         
-    def refine_features_for_fold(self, fold):
+    def refine_features_for_fold(self, fold, train_ids=None):
         """
         为指定的 fold 执行 Stage 2 特征精炼
-        
+
         Args:
             fold: fold 编号
-            
+            train_ids: 训练集样本ID列表，如果提供则只使用训练集样本进行特征精炼
+
         Returns:
             输出文件路径
         """
         print(f"\n[{self.study}] Fold {fold}: 开始 Stage 2 特征精炼...")
-        
+
         # 1. 读取 mRMR 筛选的基因文件
         mrmr_file = os.path.join(
-            self.INPUT_ROOT, 
-            f'mrmr_{self.study}', 
+            self.INPUT_ROOT,
+            f'mrmr_{self.study}',
             f'fold_{fold}_genes.csv'
         )
-        
+
         if not os.path.exists(mrmr_file):
             print(f"  ❌ 找不到 mRMR 输入文件: {mrmr_file}")
             return None
-        
+
         # 读取并转置：(行=基因, 列=样本) -> (行=样本, 列=基因)
         df_genes = pd.read_csv(mrmr_file, index_col=0)
         print(f"  [数据] mRMR 基因文件: {df_genes.shape[0]} 基因 x {df_genes.shape[1]} 样本")
-        
+
         df_genes_T = df_genes.T  # 转置: 行=样本, 列=基因
         df_genes_T.index = [str(i)[:12] for i in df_genes_T.index]  # 截断样本 ID
-        
+
+        # 【修复数据泄露】如果提供了 train_ids，只保留训练集样本
+        if train_ids is not None:
+            train_ids = [str(i)[:12] for i in train_ids]
+            original_count = len(df_genes_T)
+            df_genes_T = df_genes_T[df_genes_T.index.isin(train_ids)]
+            print(f"  [数据泄露修复] 只保留训练集样本: {original_count} -> {len(df_genes_T)}")
+
         # 2. 读取临床数据获取 OS 列
         clinical_data = self._load_clinical_data()
-        
+
         # 3. 对齐样本并合并数据
         df_merged = self._merge_data(df_genes_T, clinical_data)
         
@@ -388,11 +396,36 @@ class Stage2Refiner:
 # 命令行入口
 # ============================================================
 
+def parse_split_file(split_file):
+    """
+    解析划分文件，获取训练集样本ID
+
+    Args:
+        split_file: 划分文件路径
+
+    Returns:
+        train_ids: 训练集样本ID列表
+    """
+    split_df = pd.read_csv(split_file)
+
+    # 支持多种格式
+    if 'train' in split_df.columns:
+        # 格式: train, val, test (每行一个ID)
+        train_ids = split_df['train'].dropna().unique().tolist()
+    elif 'train_ids' in split_df.columns:
+        # 格式: train_ids, val_ids, test_ids
+        train_ids = split_df['train_ids'].dropna().tolist()
+    else:
+        raise ValueError(f"不支持的划分文件格式，列名: {list(split_df.columns)}")
+
+    return [str(i).strip() for i in train_ids if pd.notna(i)]
+
+
 def main():
     """主函数：命令行入口"""
     import argparse
     import glob
-    
+
     parser = argparse.ArgumentParser(
         description='Stage 2 特征精炼: 使用 PC 算法对 mRMR 筛选的特征进行二次筛选',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -400,9 +433,9 @@ def main():
 示例:
     # 处理单个 fold
     python run_stage2_refinement.py --study brca --fold 0 --clinical_dir /path/to/clinical
-    
-    # 批量处理所有 folds
-    python run_stage2_refinement.py --study brca --fold all --clinical_dir /path/to/clinical
+
+    # 批量处理所有 folds（使用嵌套CV划分，避免数据泄露）
+    python run_stage2_refinement.py --study brca --fold all --split_dir /path/to/splits/nested_cv --clinical_dir /path/to/clinical
         """
     )
     parser.add_argument('--study', type=str, required=True,
@@ -411,7 +444,9 @@ def main():
                         help='Fold 编号 (0-4) 或 "all" 运行所有 folds')
     parser.add_argument('--clinical_dir', type=str, default=None,
                         help='临床数据目录，包含 tcga_{study}_clinical.csv (可选)')
-    
+    parser.add_argument('--split_dir', type=str, default=None,
+                        help='嵌套CV划分目录，会自动读取 {split_dir}/{study}/nested_splits_{fold}.csv 获取训练集ID (避免数据泄露)')
+
     args = parser.parse_args()
     
     # 确定要运行的 folds
@@ -434,29 +469,39 @@ def main():
         print(f"[Info] 发现 {len(folds)} 个 folds: {folds}")
     else:
         folds = [int(args.fold)]
-    
+
     # 创建特征精炼器
     refiner = Stage2Refiner(
         study=args.study,
         clinical_dir=args.clinical_dir
     )
-    
+
     output_files = []
     for fold in folds:
         print(f"\n{'='*60}")
         print(f"[Fold {fold}] 处理中...")
         print(f"{'='*60}")
-        
-        # 运行 Stage 2 特征精炼
-        output_file = refiner.refine_features_for_fold(fold=fold)
-        
+
+        # 【修复数据泄露】如果提供了 split_dir，读取训练集样本ID
+        train_ids = None
+        if args.split_dir:
+            split_file = os.path.join(args.split_dir, args.study, f'nested_splits_{fold}.csv')
+            if os.path.exists(split_file):
+                train_ids = parse_split_file(split_file)
+                print(f"  [数据泄露修复] 已加载训练集样本ID: {len(train_ids)} 个")
+            else:
+                print(f"  ⚠️ Warning: 划分文件不存在: {split_file}，将使用全部样本")
+
+        # 运行 Stage 2 特征精炼（传入训练集ID以避免数据泄露）
+        output_file = refiner.refine_features_for_fold(fold=fold, train_ids=train_ids)
+
         if output_file:
             output_files.append(output_file)
             print(f"\n✅ Fold {fold} 完成!")
             print(f"   输出文件: {output_file}")
         else:
             print(f"\n⚠️  Fold {fold} 跳过")
-    
+
     # 汇总
     print(f"\n{'='*60}")
     print(f"全部完成! 共处理 {len(output_files)} 个 folds")

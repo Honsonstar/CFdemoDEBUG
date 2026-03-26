@@ -1,17 +1,17 @@
 #!/bin/bash
 
 # ====================================================================
-# 多模态消融实验脚本（使用 mRMR+Stage2 精炼基因特征）
+# 多模态消融实验脚本（使用 CPCG 筛选的基因特征）
 # 对比 Gene Only、Text Only、Fusion 三种模式的性能
 # ====================================================================
 
 # 检查参数
 if [ -z "$1" ]; then
-    echo "❌ 用法: bash run_ablation_study_mrmr_stage2.sh <癌种简称>"
-    echo "   例如: bash run_ablation_study_mrmr_stage2.sh blca"
+    echo "❌ 用法: bash run_ablation_study_cpcg.sh <癌种简称>"
+    echo "   例如: bash run_ablation_study_cpcg.sh blca"
     echo ""
-    echo "📝 说明: 本脚本使用 mRMR+Stage2 (PC算法) 精炼后的基因特征"
-    echo "   特征路径: features/mrmr_stage2_{study}/fold_{fold}_genes.csv"
+    echo "📝 说明: 本脚本使用 CPCG 筛选的基因特征"
+    echo "   特征路径: features/{study}/fold_{fold}_genes.csv"
     exit 1
 fi
 
@@ -30,9 +30,9 @@ LABEL_FILE="datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv"
 # 交叉验证划分文件: 5折嵌套交叉验证的划分
 SPLIT_DIR="splits/nested_cv/${STUDY}"
 
-# 【关键修改】mRMR+Stage2 精炼基因特征文件
-# 路径格式: features/mrmr_stage2_{study}/fold_{fold}_genes.csv
-FEATURE_DIR="features/mrmr_stage2_${STUDY}"
+# 【关键修改】CPCG 基因特征文件
+# 路径格式: features/{study}/fold_{fold}_genes.csv
+FEATURE_DIR="features/${STUDY}"
 
 # RNA原始数据: 用于加载完整的RNA表达数据（备选）
 OMICS_DIR="datasets_csv/raw_rna_data/combine/${STUDY}"
@@ -45,11 +45,11 @@ DATA_ROOT_DIR="data/${STUDY}/pt_files"
 # BioBERT预训练模型: 文本编码器（预训练，无需下载）
 BIOBERT_DIR="biobert"
 
-# 【修改】消融实验结果目录: 添加 mrmr_stage2 标识以区分
-ABLRESULTS_DIR="results/ablation_mrmr_stage2/${STUDY}"
+# 【修改】消融实验结果目录: 添加 cpcg 标识以区分
+ABLRESULTS_DIR="results/ablation_cpcg/${STUDY}"
 
 # 日志目录
-LOG_DIR="log/${TODAY}/${STUDY}_mrmr_stage2"
+LOG_DIR="log/${TODAY}/${STUDY}_cpcg"
 
 # 报告目录
 REPORT_DIR="report"
@@ -69,14 +69,14 @@ mkdir -p "${LOG_DIR}" "${REPORT_DIR}"
 # 配置日志文件
 MAIN_LOG="${LOG_DIR}/ablation_study.log"
 
-echo "🚀 开始多模态消融实验: ${STUDY} (mRMR+Stage2)"
+echo "🚀 开始多模态消融实验: ${STUDY} (CPCG)"
 echo "📁 特征路径: ${FEATURE_DIR}"
 echo "📁 日志目录: ${LOG_DIR}"
 echo "📁 结果将保存到: ${ABLRESULTS_DIR}"
 echo "=============================================="
 echo "" | tee -a "${MAIN_LOG}"
 echo "==============================================" | tee -a "${MAIN_LOG}"
-echo "🚀 开始多模态消融实验: ${STUDY} (mRMR+Stage2)" | tee -a "${MAIN_LOG}"
+echo "🚀 开始多模态消融实验: ${STUDY} (CPCG)" | tee -a "${MAIN_LOG}"
 echo "📁 特征路径: ${FEATURE_DIR}" | tee -a "${MAIN_LOG}"
 echo "📁 日志目录: ${LOG_DIR}" | tee -a "${MAIN_LOG}"
 echo "==============================================" | tee -a "${MAIN_LOG}"
@@ -93,11 +93,11 @@ export LABEL_FILE      # 导出标签文件路径（供Python使用）
 export SPLIT_DIR       # 导出划分文件路径（供Python使用）
 export ABLRESULTS_DIR  # 导出结果目录路径（供Python使用）
 
-# 【修改】检查 mRMR+Stage2 特征文件是否存在
+# 【修改】检查 CPCG 特征文件是否存在
 check_features() {
     local study=$1
     local all_exist=true
-    echo "🔍 检查 ${study^^} 的 mRMR+Stage2 特征文件..."
+    echo "🔍 检查 ${study^^} 的 CPCG 特征文件..."
     for fold in $(seq 0 $((K_FOLDS-1))); do
         local file="${FEATURE_DIR}/fold_${fold}_genes.csv"
         if [ -f "$file" ]; then
@@ -108,13 +108,13 @@ check_features() {
         fi
     done
     if [ "$all_exist" = false ]; then
-        echo "❌ 错误: ${study} mRMR+Stage2 特征文件不完整，跳过训练"
+        echo "❌ 错误: ${study} CPCG 特征文件不完整，跳过训练"
         echo "请先运行:"
         echo "  1. python preprocessing/CPCG_algo/stage0/run_mrmr.py --study ${study} --fold all ..."
         echo "  2. bash scripts/quick_stage2_refine.sh ${study}"
         return 1
     fi
-    echo "✅ ${study} mRMR+Stage2 特征文件检查通过"
+    echo "✅ ${study} CPCG 特征文件检查通过"
     return 0
 }
 
@@ -221,7 +221,7 @@ run_ablation_mode() {
 # 1. Gene Only 模式 (ab_model=2)
 # ====================================================================
 GENE_LOG="${ABLRESULTS_DIR}/gene_training.log"
-run_ablation_mode "Gene Only (仅基因 - mRMR+Stage2)" 2 "gene" "${GENE_LOG}"
+run_ablation_mode "Gene Only (仅基因 - CPCG)" 2 "gene" "${GENE_LOG}"
 
 # 汇总 Gene Only 结果
 echo "" | tee -a "${GENE_LOG}"
@@ -300,7 +300,7 @@ if dfs:
     result = pd.concat(dfs).sort_values('fold')
     result.to_csv(gene_summary_path, index=False)
     mean_cindex = result['val_cindex'].mean()
-    print(f'✅ Gene Only (mRMR+Stage2) 汇总完成: {len(dfs)}/{len(dfs) + len(missing_folds)} 折成功')
+    print(f'✅ Gene Only (CPCG) 汇总完成: {len(dfs)}/{len(dfs) + len(missing_folds)} 折成功')
     print(f'   平均 C-Index: {mean_cindex:.4f}')
 else:
     print('❌ 错误: 没有任何折的结果文件可用')
@@ -360,10 +360,11 @@ for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
         summary_file = max(partial_files, key=os.path.getmtime)
         print(f"     ✓ Fold {fold_num}: 使用 {os.path.basename(summary_file)}")
     else:
-        root_summary = f"{fold_dir}/summary.csv"
-        if os.path.exists(root_summary):
-            summary_file = root_summary
-            print(f"     ✓ Fold {fold_num}: 使用 summary.csv")
+        # 递归搜索子目录中的 summary.csv
+        summary_files = glob.glob(f"{fold_dir}/**/summary.csv", recursive=True)
+        if summary_files:
+            summary_file = max(summary_files, key=os.path.getmtime)
+            print(f"     ✓ Fold {fold_num}: 使用 {os.path.basename(summary_file)}")
         else:
             print(f"     ✗ Fold {fold_num}: 文件缺失")
             missing_folds.append(fold_num)
@@ -443,10 +444,11 @@ for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
         summary_file = max(partial_files, key=os.path.getmtime)
         print(f"     ✓ Fold {fold_num}: 使用 {os.path.basename(summary_file)}")
     else:
-        root_summary = f"{fold_dir}/summary.csv"
-        if os.path.exists(root_summary):
-            summary_file = root_summary
-            print(f"     ✓ Fold {fold_num}: 使用 summary.csv")
+        # 递归搜索子目录中的 summary.csv
+        summary_files = glob.glob(f"{fold_dir}/**/summary.csv", recursive=True)
+        if summary_files:
+            summary_file = max(summary_files, key=os.path.getmtime)
+            print(f"     ✓ Fold {fold_num}: 使用 {os.path.basename(summary_file)}")
         else:
             print(f"     ✗ Fold {fold_num}: 文件缺失")
             missing_folds.append(fold_num)
@@ -486,7 +488,7 @@ echo "=============================================="
 
 FINAL_CSV="${ABLRESULTS_DIR}/final_comparison.csv"
 export FINAL_CSV
-REPORT_CSV="report/${TODAY}_${STUDY}_ablation_mrmr_stage2_comparison.csv"
+REPORT_CSV="report/${TODAY}_${STUDY}_ablation_cpcg_comparison.csv"
 
 # 【加固】等待所有后台任务完成
 wait
@@ -522,7 +524,7 @@ def read_summary_csv(directory, mode_name):
         return None
 
 # 读取三个模式的汇总
-gene_summary = read_summary_csv(gene_dir, "Gene Only (mRMR+Stage2)")
+gene_summary = read_summary_csv(gene_dir, "Gene Only (CPCG)")
 text_summary = read_summary_csv(text_dir, "Text Only")
 fusion_summary = read_summary_csv(fusion_dir, "Fusion")
 
@@ -542,7 +544,7 @@ print(f"\n📊 构建对比表格 (共 {len(all_folds)} 折)...")
 for fold in all_folds:
     row = {'Fold': fold}
 
-    # Gene Only (mRMR+Stage2)
+    # Gene Only (CPCG)
     if gene_summary is not None and 'fold' in gene_summary.columns:
         gene_row = gene_summary[gene_summary['fold'] == fold]
         if not gene_row.empty:
@@ -585,12 +587,12 @@ fusion_mean = comparison_df['Fusion_C_Index'].mean()
 
 # 打印结果
 print("\n" + "="*60)
-print("📊 多模态消融实验结果汇总 (mRMR+Stage2)")
+print("📊 多模态消融实验结果汇总 (CPCG)")
 print("="*60)
 print(comparison_df.to_string(index=False))
 print("="*60)
 print(f"\n🎯 平均 C-Index:")
-print(f"   • Gene Only (mRMR+Stage2): {gene_mean:.4f}" if not np.isnan(gene_mean) else "   • Gene Only (mRMR+Stage2): N/A")
+print(f"   • Gene Only (CPCG): {gene_mean:.4f}" if not np.isnan(gene_mean) else "   • Gene Only (CPCG): N/A")
 print(f"   • Text Only (仅文本): {text_mean:.4f}" if not np.isnan(text_mean) else "   • Text Only (仅文本): N/A")
 print(f"   • Fusion (多模态融合): {fusion_mean:.4f}" if not np.isnan(fusion_mean) else "   • Fusion (多模态融合): N/A")
 print(f"\n📁 结果已保存到: {final_csv_path}")
@@ -599,7 +601,7 @@ print("="*60)
 # 计算提升百分比
 if gene_mean and not np.isnan(gene_mean) and gene_mean > 0:
     fusion_improvement = ((fusion_mean - gene_mean) / gene_mean) * 100
-    print(f"\n📈 Fusion 相对于 Gene Only (mRMR+Stage2) 的提升: {fusion_improvement:+.2f}%")
+    print(f"\n📈 Fusion 相对于 Gene Only (CPCG) 的提升: {fusion_improvement:+.2f}%")
 if text_mean and not np.isnan(text_mean) and text_mean > 0:
     fusion_vs_text = ((fusion_mean - text_mean) / text_mean) * 100
     print(f"📈 Fusion 相对于 Text Only 的提升: {fusion_vs_text:+.2f}%")
@@ -613,7 +615,7 @@ echo "📁 结果目录: ${ABLRESULTS_DIR}"
 echo "📊 对比表格: ${FINAL_CSV}"
 echo "📋 报告文件: ${REPORT_CSV}"
 echo "⚡ 并行任务数: ${MAX_JOBS}"
-echo "🧬 特征类型: mRMR+Stage2 (PC算法精炼)"
+echo "🧬 特征类型: CPCG (PC算法精炼)"
 echo "=============================================="
 
 # 【新增】复制最终结果到 report 目录

@@ -16,14 +16,24 @@
 # ====================================================================
 
 # 检查参数
-if [ -z "$1" ]; then
-    echo "用法: bash scripts/run_ablation_simple.sh <癌种简称>"
-    echo "例如: bash scripts/run_ablation_simple.sh coadread"
-    exit 1
-fi
+# 癌症种类列表
+ALL_CANCERS=("brca" "blca" "hnsc" "stad" "coadread")
 
-STUDY=$1
+if [ -z "$1" ]; then
+    echo "未指定癌症种类，将运行所有癌症种类..."
+    CANCERS_TO_RUN=("${ALL_CANCERS[@]}")
+else
+    # 解析参数（支持多个癌症种类）
+    CANCERS_TO_RUN=("$@")
+fi
 TODAY=$(date +%Y-%m-%d)
+
+# ==================== 主循环 ====================
+for STUDY in "${CANCERS_TO_RUN[@]}"; do
+    echo ""
+    echo "################################################################"
+    echo "### 开始处理癌症类型: ${STUDY^^}"
+    echo "################################################################"
 
 # ==================== 数据路径配置 ====================
 
@@ -34,8 +44,11 @@ LABEL_FILE="datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv"
 SPLIT_DIR="splits/CGI_nested_cv/${STUDY}"
 
 # CGI筛选的基因特征文件
-FEATURE_DIR="preprocessing/CGI/data/${STUDY}_found_genes"
-FEATURE_FILE="${STUDY}_found_Genes_fold"
+# FEATURE_DIR="preprocessing/CGI/data/${STUDY}_found_genes"
+# FEATURE_FILE="${STUDY}_found_Genes_fold"
+
+# 稳定特征文件（新地址）
+FEATURE_DIR="features/stable/${STUDY}"
 
 # RNA原始数据
 OMICS_DIR="datasets_csv/raw_rna_data/combine/${STUDY}"
@@ -82,9 +95,9 @@ fi
 # 检查特征文件
 check_features() {
     local all_exist=true
-    echo "🔍 检查 ${STUDY^^} 的 CGI 基因特征文件..."
+    echo "🔍 检查 ${STUDY^^} 的稳定基因特征文件..."
     for fold in $(seq 0 $((K_FOLDS-1))); do
-        local file="${FEATURE_DIR}/${FEATURE_FILE}${fold}.csv"
+        local file="${FEATURE_DIR}/fold_${fold}_genes.csv"
         if [ -f "$file" ]; then
             echo "   ✓ Fold ${fold}: $(basename $file) 存在"
         else
@@ -353,7 +366,16 @@ print("="*50)
 EOF
 
 echo ""
-echo "✅ 简化消融实验完成！"
+echo "✅ ${STUDY} 消融实验完成！"
 echo "📁 结果目录: ${ABLRESULTS_DIR}"
 echo "📊 对比表格: ${FINAL_CSV}"
 echo "📋 报告文件: ${REPORT_CSV}"
+
+done  # 结束癌症种类循环
+
+echo ""
+echo "################################################################"
+echo "### ✅ 所有癌症种类消融实验完成！"
+echo "################################################################"
+echo "📁 结果目录: results/ablation/"
+echo "📋 报告目录: report/"

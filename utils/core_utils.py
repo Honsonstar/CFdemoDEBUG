@@ -17,16 +17,20 @@ from models.model_TMIL import TMIL
 from sksurv.metrics import concordance_index_censored, concordance_index_ipcw, brier_score, integrated_brier_score, cumulative_dynamic_auc
 from sksurv.util import Surv
 
-import pandas as pd
+# 设置 matplotlib 无显示器后端
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
 import seaborn as sns
+import pandas as pd
 from lifelines import KaplanMeierFitter
 from lifelines.statistics import logrank_test
 import pickle
 
 from transformers import (
-    get_constant_schedule_with_warmup, 
-    get_linear_schedule_with_warmup, 
+    get_constant_schedule_with_warmup,
+    get_linear_schedule_with_warmup,
     get_cosine_schedule_with_warmup
 )
 
@@ -1262,6 +1266,68 @@ def _summary(dataset_factory, model, modality, loader, loss_fn, survival_train=N
         return patient_results, c_index, c_index2, BS, IBS, iauc, total_loss, 0
 
 
+def _save_training_curves(training_history, results_dir, fold_idx):
+    r"""
+    绘制并保存训练曲线
+
+    Args:
+        - training_history : dict, 包含 epochs, train_loss, val_cindex 等
+        - results_dir : str, 结果保存目录
+        - fold_idx : int, fold编号
+    """
+    from datetime import datetime
+
+    epochs = training_history['epochs']
+    train_loss = training_history['train_loss']
+    val_cindex = training_history['val_cindex']
+    val_cindex_ipcw = training_history['val_cindex_ipcw']
+    val_BS = training_history['val_BS']
+    val_IBS = training_history['val_IBS']
+    val_iauc = training_history['val_iauc']
+
+    # 创建图形 - 两个子图
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+    # 子图1: Train Loss 曲线
+    ax1.plot(epochs, train_loss, 'b-', linewidth=2, label='Train Loss')
+    ax1.set_xlabel('Epoch', fontsize=12)
+    ax1.set_ylabel('Loss', fontsize=12)
+    ax1.set_title('Training Loss Curve', fontsize=14)
+    ax1.legend(fontsize=10)
+    ax1.grid(True, alpha=0.3)
+
+    # 子图2: C-Index 等评估指标曲线
+    ax2.plot(epochs, val_cindex, 'g-', linewidth=2, label='C-Index')
+    ax2.plot(epochs, val_cindex_ipcw, 'c-', linewidth=2, label='C-Index IPCW')
+    ax2.plot(epochs, val_BS, 'r-', linewidth=2, label='Brier Score')
+    ax2.plot(epochs, val_IBS, 'm-', linewidth=2, label='IBS')
+    ax2.plot(epochs, val_iauc, 'y-', linewidth=2, label='iAUC')
+    ax2.set_xlabel('Epoch', fontsize=12)
+    ax2.set_ylabel('Score', fontsize=12)
+    ax2.set_title('Validation Metrics Curve', fontsize=14)
+    ax2.legend(fontsize=9, loc='best')
+    ax2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    # 生成带时间戳的文件名
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+    save_path = os.path.join(results_dir, f'training_curve_fold{fold_idx}_{timestamp}.png')
+
+    # 保存图形
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    plt.close()
+
+    print(f"📊 训练曲线已保存至: {save_path}")
+
+    # 同时保存数据为CSV
+    import pandas as pd
+    csv_path = save_path.replace('.png', '.csv')
+    df = pd.DataFrame(training_history)
+    df.to_csv(csv_path, index=False)
+    print(f"📊 训练数据已保存至: {csv_path}")
+
+
 def _get_lr_scheduler(args, optimizer, dataloader):
     scheduler_name = args.lr_scheduler
     warmup_epochs = args.warmup_epochs
@@ -1310,33 +1376,49 @@ def _step(cur, args, loss_fn, model, optimizer, scheduler, train_loader, val_loa
     best_c_index = 0.0
     best_model_path = os.path.join(args.results_dir, f'best_model_fold_{cur}.pth')
 
-    for epoch in range(args.max_epochs):
-        if args.enable_multitask:
-            _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, args.enable_multitask, ab_model=ab_model)
-        else:
-            _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, ab_model=ab_model)
+    # 【新增】训练曲线记录
+    training_history = {
+        'epochs': [],
+        'train_loss': [],
+        'val_cindex': [],
+        'val_cindex_ipcw': [],
+        'val_BS': [],
+        'val_IBS': [],
+        'val_iauc': []
+    }
 
+    for epoch in range(args.max_epochs):
+        # 训练阶段
+        if args.enable_multitask:
+            train_result = _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, args.enable_multitask, ab_model=ab_model)
+            train_c_index, train_loss_epoch = train_result[0], train_result[1]
+        else:
+            train_result = _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, ab_model=ab_model)
+            train_c_index, train_loss_epoch = train_result[0], train_result[1]
+
+        # 验证阶段
         if args.enable_multitask:
             results_dict, val_cindex, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss, val_stage_accuracy = _summary(
                 args.dataset_factory, model, args.modality, val_loader, loss_fn, all_survival, args.enable_multitask, ab_model=ab_model)
-            # if val_cindex > best_c_index and best_c_index < 1.0:
-            #     best_c_index = val_cindex
         else:
             results_dict, val_cindex, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss, val_stage_accuracy = _summary(
                 args.dataset_factory, model, args.modality, val_loader, loss_fn, all_survival, args.enable_multitask, ab_model=ab_model)
+
+        # 记录训练曲线数据（使用训练集的 loss）
+        training_history['epochs'].append(epoch)
+        training_history['train_loss'].append(train_loss_epoch)
+        training_history['val_cindex'].append(val_cindex)
+        training_history['val_cindex_ipcw'].append(val_cindex_ipcw)
+        training_history['val_BS'].append(val_BS)
+        training_history['val_IBS'].append(val_IBS)
+        training_history['val_iauc'].append(val_iauc)
+
         if val_cindex > best_c_index and best_c_index < 1.0:
             best_c_index = val_cindex
-            # torch.save({
-            #     'epoch': epoch,
-            #     'model_state_dict': model.state_dict(),
-            #     'optimizer_state_dict': optimizer.state_dict(),
-            #     'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
-            #     'best_c_index': best_c_index,
-            #     'fold': cur,
-            #     'args': args
-            # }, best_model_path)
-            # print('model saved!')
         print('Best Val c-index: {:.4f}, Stage accuracy: {:.4f}'.format(best_c_index, val_stage_accuracy))
+
+    # 【新增】训练完成后绘制并保存曲线
+    _save_training_curves(training_history, args.results_dir, cur)
 
     return results_dict, (best_c_index, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss, val_stage_accuracy)
 
@@ -1397,18 +1479,39 @@ def _step_with_train_test_results(cur, args, loss_fn, model, optimizer, schedule
     best_test_results = None
     best_train_results = None
     best_model_path = os.path.join(args.results_dir, f'best_model_fold_{cur}.pth')
-    
+
+    # 【新增】训练曲线记录
+    training_history = {
+        'epochs': [],
+        'train_loss': [],
+        'val_cindex': [],
+        'val_cindex_ipcw': [],
+        'val_BS': [],
+        'val_IBS': [],
+        'val_iauc': []
+    }
+
     # 【修改】从args中获取数据集名称（转换为大写，如tcga_brca -> TCGA_BRCA）
     dataset_name = args.study.upper().replace('_', '_')
 
     for epoch in range(args.max_epochs):
         # 训练
-        _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, args.enable_multitask, ab_model=ab_model)
+        train_result = _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, args.enable_multitask, ab_model=ab_model)
+        train_c_index, train_loss_epoch = train_result[0], train_result[1]
 
         # 【修改】在测试集上评估，传递dataset_name和fold_idx
         results_dict, val_cindex, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss, val_stage_accuracy = _summary(
             args.dataset_factory, model, args.modality, val_loader, loss_fn, all_survival, args.enable_multitask,
             save_visualizations=True, dataset_name=dataset_name, fold_idx=cur, ab_model=ab_model)
+
+        # 记录训练曲线数据
+        training_history['epochs'].append(epoch)
+        training_history['train_loss'].append(train_loss_epoch)
+        training_history['val_cindex'].append(val_cindex)
+        training_history['val_cindex_ipcw'].append(val_cindex_ipcw)
+        training_history['val_BS'].append(val_BS)
+        training_history['val_IBS'].append(val_IBS)
+        training_history['val_iauc'].append(val_iauc)
 
         # 【修改】第一个epoch或val_cindex更大时强制保存
         if epoch == 0 or val_cindex > best_c_index:
@@ -1433,9 +1536,12 @@ def _step_with_train_test_results(cur, args, loss_fn, model, optimizer, schedule
             #     'fold': cur,
             #     'args': args
             # }, best_model_path)
-            
+
         print('Best Val c-index: {:.4f}'.format(best_c_index))
-    
+
+    # 【新增】训练完成后绘制并保存曲线
+    _save_training_curves(training_history, args.results_dir, cur)
+
     return best_test_results, best_train_results, (best_c_index, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss, val_stage_accuracy)
 
 def generate_km_plot_and_save_data(train_results, test_results, dataset_name, save_dir=None):

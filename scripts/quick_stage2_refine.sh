@@ -69,6 +69,16 @@ else
     echo "✅ 临床数据: $CLINICAL_FILE"
 fi
 
+# 【新增】检查嵌套CV划分目录
+SPLIT_DIR="splits/nested_cv/${STUDY}"
+if [ ! -d "$SPLIT_DIR" ]; then
+    echo "⚠️  Warning: 嵌套CV划分目录不存在: $SPLIT_DIR"
+    echo "   Stage2 特征精炼将使用全部样本（可能导致数据泄露）"
+    SPLIT_DIR=""
+else
+    echo "✅ 嵌套CV划分目录: $SPLIT_DIR (将使用训练集样本避免数据泄露)"
+fi
+
 if [ $MISSING -eq 1 ]; then
     echo "\n⚠️  缺少必要文件!"
     echo "请先运行 mRMR 特征选择:"
@@ -82,10 +92,20 @@ echo "\n✅ 所有必要文件检查通过"
 echo "\n🧬 开始 Stage 2 特征精炼（PC算法）..."
 echo "=========================================="
 
-python3 preprocessing/CPCG_algo/stage0/run_stage2_refinement.py \
+# 构建命令参数
+CMD="python3 preprocessing/CPCG_algo/stage0/run_stage2_refinement.py \
     --study $STUDY \
     --fold all \
-    --clinical_dir datasets_csv/clinical_data
+    --clinical_dir datasets_csv/clinical_data"
+
+# 【修复数据泄露】如果存在嵌套CV划分目录，添加 --split_dir 参数
+if [ -n "$SPLIT_DIR" ]; then
+    CMD="$CMD --split_dir splits/nested_cv"
+    echo "   [数据泄露修复] 将使用训练集样本进行特征精炼"
+fi
+
+# 执行命令
+eval $CMD
 
 EXIT_CODE=$?
 

@@ -620,13 +620,18 @@ class SurvivalDatasetFactory:
             f'features/mrmr_stage2_{study_name}/fold_{fold}_genes.csv'
         )
 
-        # 路径4: CGI 特征文件 (例如 preprocessing/CGI/data/coadread_found_genes/coadread_found_Genes_fold0.csv)
+        # 路径4: features/stable_{study}/fold_{fold}_genes.csv (最高优先级)
+        fold_feature_file_stable = os.path.join(
+            f'features/stable/{study_name}/fold_{fold}_genes.csv'
+        )
+
+        # 路径5: CGI 特征文件 (例如 preprocessing/CGI/data/coadread_found_genes/coadread_found_Genes_fold0.csv)
         fold_feature_file_cgi = os.path.join(
             f'preprocessing/CGI/data/{study_name}_found_genes/{study_name}_found_Genes_fold{fold}.csv'
         )
 
         # 选择存在的路径 (按优先级)
-        # 优先级: CGI > features/{study} > mRMR Stage2
+        # 优先级: features/stable > CGI > features/{study} > mRMR Stage2
         # 说明：CGI 只在 CGI 模式下使用（splits/CGI_nested_cv），其他模式用 mRMR
         fold_feature_file = None
 
@@ -634,7 +639,10 @@ class SurvivalDatasetFactory:
         split_dir = getattr(args, 'split_dir', '') if hasattr(args, 'split_dir') else ''
         is_cgi_mode = 'CGI' in split_dir or 'cgi' in str(fold_feature_file_cgi)
 
-        if is_cgi_mode and os.path.exists(fold_feature_file_cgi):
+        # 最高优先级: features/stable/{study}/ (硬编码路径)
+        if os.path.exists(fold_feature_file_stable):
+            fold_feature_file = fold_feature_file_stable
+        elif is_cgi_mode and os.path.exists(fold_feature_file_cgi):
             # CGI 模式：优先使用 CGI 特征文件
             fold_feature_file = fold_feature_file_cgi
         elif os.path.exists(fold_feature_file_v1):
