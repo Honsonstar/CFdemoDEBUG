@@ -162,8 +162,9 @@ run_mode() {
     local label_file="$5"
     local split_dir="$6"
     local omics_dir="$7"
-    local data_root_dir="$8"
-    local abresults_dir="$9"
+    local feature_dir="$8"
+    local data_root_dir="$9"
+    local abresults_dir="${10}"
 
     local mode_dir="${abresults_dir}/${results_subdir}"
     local mode_log="${abresults_dir}/${results_subdir}_training.log"
@@ -195,6 +196,7 @@ run_mode() {
             --n_classes 4 \
             --modality snn \
             --omics_dir "$omics_dir" \
+            --fold_feature_dir "$feature_dir" \
             --data_root_dir "$data_root_dir" \
             --label_col survival_months \
             --type_of_path combine \
@@ -224,9 +226,11 @@ run_mode() {
         fi
 
         local partial_count
+        local summary_count
         partial_count=$(find "$fold_dir" -type f -name "summary_partial_*.csv" | wc -l | tr -d ' ')
-        if [ "$partial_count" -eq 0 ]; then
-            echo "错误：Fold ${fold} 未生成 summary_partial_*.csv，判定为失败。" | tee -a "$mode_log"
+        summary_count=$(find "$fold_dir" -type f -name "summary.csv" | wc -l | tr -d ' ')
+        if [ "$partial_count" -eq 0 ] && [ "$summary_count" -eq 0 ]; then
+            echo "错误：Fold ${fold} 未生成 summary_partial_*.csv 或 summary.csv，判定为失败。" | tee -a "$mode_log"
             failed_folds+=("$fold")
             continue
         fi
@@ -246,6 +250,9 @@ merge_mode_summary() {
     local out_csv="$2"
     local mode_name="$3"
 
+    echo ""
+    echo "📊 汇总 ${mode_name} 结果..."
+
     python3 - << 'PY'
 import glob
 import os
@@ -262,11 +269,17 @@ for fold in range(k_folds):
     if not os.path.isdir(fold_dir):
         print(f"{mode_name} Fold {fold}: 目录不存在，跳过")
         continue
-    partials = sorted(glob.glob(os.path.join(fold_dir, "summary_partial_*.csv")))
-    if not partials:
-        print(f"{mode_name} Fold {fold}: 未找到 summary_partial_*.csv，跳过")
-        continue
-    f = partials[-1]
+    partials = sorted(glob.glob(os.path.join(fold_dir, "**", "summary_partial_*.csv"), recursive=True))
+    if partials:
+        f = partials[-1]
+        from_summary = False
+    else:
+        summaries = sorted(glob.glob(os.path.join(fold_dir, "**", "summary.csv"), recursive=True))
+        if not summaries:
+            print(f"{mode_name} Fold {fold}: 未找到 summary_partial_*.csv 或 summary.csv，跳过")
+            continue
+        f = summaries[-1]
+        from_summary = True
     try:
         df = pd.read_csv(f)
         if "val_cindex" not in df.columns:
@@ -274,18 +287,21 @@ for fold in range(k_folds):
             continue
         val = float(df["val_cindex"].iloc[-1])
         rows.append({"fold": fold, "val_cindex": val, "source_file": os.path.basename(f)})
-        print(f"{mode_name} Fold {fold}: 已收集 {os.path.basename(f)}")
+        if from_summary:
+            print(f"  ✓ Fold {fold}: {os.path.basename(f)} (from summary.csv)")
+        else:
+            print(f"  ✓ Fold {fold}: {os.path.basename(f)}")
     except Exception as e:
         print(f"{mode_name} Fold {fold}: 读取失败，原因：{e}")
 
 if rows:
     out_df = pd.DataFrame(rows).sort_values("fold")
     out_df.to_csv(out_csv, index=False)
-    print(f"{mode_name} 汇总完成：{out_csv}")
-    print(f"{mode_name} 平均 val_cindex: {out_df['val_cindex'].mean():.4f}")
+    mean_cindex = out_df['val_cindex'].mean()
+    print(f"✅ {mode_name} 汇总: {len(rows)}/{k_folds} 折成功, 平均 C-Index: {mean_cindex:.4f}")
 else:
     pd.DataFrame(columns=["fold", "val_cindex", "source_file"]).to_csv(out_csv, index=False)
-    print(f"{mode_name} 无可用结果，已写入空汇总：{out_csv}")
+    print(f"❌ {mode_name} 汇总失败: 无可用结果")
 PY
 }
 
@@ -374,7 +390,7 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
     echo "早停附加参数：${EXTRA_ARGS[*]:-无}" | tee -a "$MAIN_LOG"
 
     run_mode "$STUDY" "Gene Only（仅基因）" 2 "gene" \
-        "$LABEL_FILE" "$SPLIT_DIR" "$OMICS_DIR" "$DATA_ROOT_DIR" "$ABLRESULTS_DIR"
+        "$LABEL_FILE" "$SPLIT_DIR" "$OMICS_DIR" "$FEATURE_DIR" "$DATA_ROOT_DIR" "$ABLRESULTS_DIR"
     export MODE_DIR="${ABLRESULTS_DIR}/gene"
     export OUT_CSV="${ABLRESULTS_DIR}/gene/summary.csv"
     export MODE_NAME="Gene Only"
@@ -382,7 +398,7 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
     merge_mode_summary "$MODE_DIR" "$OUT_CSV" "$MODE_NAME" | tee -a "$MAIN_LOG"
 
     run_mode "$STUDY" "Fusion（基因+文本）" 3 "fusion" \
-        "$LABEL_FILE" "$SPLIT_DIR" "$OMICS_DIR" "$DATA_ROOT_DIR" "$ABLRESULTS_DIR"
+        "$LABEL_FILE" "$SPLIT_DIR" "$OMICS_DIR" "$FEATURE_DIR" "$DATA_ROOT_DIR" "$ABLRESULTS_DIR"
     export MODE_DIR="${ABLRESULTS_DIR}/fusion"
     export OUT_CSV="${ABLRESULTS_DIR}/fusion/summary.csv"
     export MODE_NAME="Fusion"

@@ -665,11 +665,14 @@ class SurvivalDatasetFactory:
         print(f"🔍 [Data Loading] Loading gene features from: {fold_feature_file}")
 
         # 强制固定到 stable 特征路径，禁用其它路径的优先级回退
-        fold_feature_file = fold_feature_file_stable
+        configured_feature_dir = getattr(args, 'fold_feature_dir', None)
+        if configured_feature_dir is None or str(configured_feature_dir).strip() == "":
+            raise ValueError("Missing required argument --fold_feature_dir. 不允许特征路径回退。")
+        fold_feature_file = os.path.join(configured_feature_dir, f'fold_{fold}_genes.csv')
         print(f"🔍 [Data Loading] Loading gene features from fixed path: {fold_feature_file}")
         if not os.path.exists(fold_feature_file):
             raise FileNotFoundError(
-                f"Required stable feature file not found for fold {fold}: {fold_feature_file}"
+                f"Required feature file not found for fold {fold}: {fold_feature_file}"
             )
 
         custom_omics_dict = None

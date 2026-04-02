@@ -1357,6 +1357,29 @@ def _get_lr_scheduler(args, optimizer, dataloader):
         )
     return lr_scheduler
 
+
+def _get_early_stop_metric_value(args, val_cindex, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss):
+    monitor_name = getattr(args, 'early_stop_monitor', 'val_cindex_ipcw')
+    metric_map = {
+        'val_cindex': val_cindex,
+        'val_cindex_ipcw': val_cindex_ipcw,
+        'val_BS': val_BS,
+        'val_IBS': val_IBS,
+        'val_iauc': val_iauc,
+        'total_loss': total_loss,
+    }
+    return monitor_name, metric_map.get(monitor_name, val_cindex_ipcw)
+
+
+def _is_early_stop_improved(mode, current_value, best_value, min_delta):
+    if current_value is None:
+        return False
+    if isinstance(current_value, float) and not np.isfinite(current_value):
+        return False
+    if mode == 'min':
+        return current_value < (best_value - min_delta)
+    return current_value > (best_value + min_delta)
+
 def _step(cur, args, loss_fn, model, optimizer, scheduler, train_loader, val_loader):
     r"""
     Trains the model for the set number of epochs and validates it.
@@ -1387,6 +1410,13 @@ def _step(cur, args, loss_fn, model, optimizer, scheduler, train_loader, val_loa
         'val_iauc': []
     }
 
+    early_stop_enabled = getattr(args, 'early_stop', False)
+    early_stop_mode = getattr(args, 'early_stop_mode', 'max')
+    early_stop_patience = max(1, int(getattr(args, 'early_stop_patience', 5)))
+    early_stop_min_delta = float(getattr(args, 'early_stop_min_delta', 1e-3))
+    best_monitor_value = -np.inf if early_stop_mode == 'max' else np.inf
+    no_improve_epochs = 0
+
     for epoch in range(args.max_epochs):
         # 训练阶段
         if args.enable_multitask:
@@ -1416,6 +1446,27 @@ def _step(cur, args, loss_fn, model, optimizer, scheduler, train_loader, val_loa
         if val_cindex > best_c_index and best_c_index < 1.0:
             best_c_index = val_cindex
         print('Best Val c-index: {:.4f}, Stage accuracy: {:.4f}'.format(best_c_index, val_stage_accuracy))
+
+        if early_stop_enabled:
+            monitor_name, monitor_value = _get_early_stop_metric_value(
+                args, val_cindex, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss
+            )
+            improved = _is_early_stop_improved(
+                early_stop_mode, monitor_value, best_monitor_value, early_stop_min_delta
+            )
+            if improved:
+                best_monitor_value = monitor_value
+                no_improve_epochs = 0
+            else:
+                no_improve_epochs += 1
+
+            print(
+                f"[早停] 监控={monitor_name}, 当前值={monitor_value:.6f}, "
+                f"最佳值={best_monitor_value:.6f}, 未提升轮次={no_improve_epochs}/{early_stop_patience}"
+            )
+            if no_improve_epochs >= early_stop_patience:
+                print(f"[早停] 在 epoch {epoch} 触发停止。")
+                break
 
     # 【新增】训练完成后绘制并保存曲线
     _save_training_curves(training_history, args.results_dir, cur)
@@ -1492,6 +1543,13 @@ def _step_with_train_test_results(cur, args, loss_fn, model, optimizer, schedule
     }
 
     # 【修改】从args中获取数据集名称（转换为大写，如tcga_brca -> TCGA_BRCA）
+    early_stop_enabled = getattr(args, 'early_stop', False)
+    early_stop_mode = getattr(args, 'early_stop_mode', 'max')
+    early_stop_patience = max(1, int(getattr(args, 'early_stop_patience', 5)))
+    early_stop_min_delta = float(getattr(args, 'early_stop_min_delta', 1e-3))
+    best_monitor_value = -np.inf if early_stop_mode == 'max' else np.inf
+    no_improve_epochs = 0
+
     dataset_name = args.study.upper().replace('_', '_')
 
     for epoch in range(args.max_epochs):
@@ -1538,6 +1596,27 @@ def _step_with_train_test_results(cur, args, loss_fn, model, optimizer, schedule
             # }, best_model_path)
 
         print('Best Val c-index: {:.4f}'.format(best_c_index))
+
+        if early_stop_enabled:
+            monitor_name, monitor_value = _get_early_stop_metric_value(
+                args, val_cindex, val_cindex_ipcw, val_BS, val_IBS, val_iauc, total_loss
+            )
+            improved = _is_early_stop_improved(
+                early_stop_mode, monitor_value, best_monitor_value, early_stop_min_delta
+            )
+            if improved:
+                best_monitor_value = monitor_value
+                no_improve_epochs = 0
+            else:
+                no_improve_epochs += 1
+
+            print(
+                f"[早停] 监控={monitor_name}, 当前值={monitor_value:.6f}, "
+                f"最佳值={best_monitor_value:.6f}, 未提升轮次={no_improve_epochs}/{early_stop_patience}"
+            )
+            if no_improve_epochs >= early_stop_patience:
+                print(f"[早停] 在 epoch {epoch} 触发停止。")
+                break
 
     # 【新增】训练完成后绘制并保存曲线
     _save_training_curves(training_history, args.results_dir, cur)

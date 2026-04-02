@@ -32,6 +32,8 @@ def _process_args():
     parser.add_argument('--data_root_dir', type=str, default=None, help='data directory')
     parser.add_argument('--label_file', type=str, default=None, help='Path to csv with labels')
     parser.add_argument('--omics_dir', type=str, default=None, help='Path to dir with omics csv for all modalities')
+    parser.add_argument('--fold_feature_dir', type=str, default=None,
+                        help='Directory for fold-wise gene feature files, e.g. .../fold_0_genes.csv')
     parser.add_argument('--num_patches', type=int, default=4000, help='number of patches')
     parser.add_argument('--label_col', type=str, default="survival_months_dss", help='type of survival (OS, DSS, PFI)')
     parser.add_argument("--wsi_projection_dim", type=int, default=1)
@@ -69,6 +71,17 @@ def _process_args():
     parser.add_argument('--reg', type=float, default=1e-5, help='weight decay / L2 (default: 1e-5)')
     parser.add_argument('--lr_scheduler', type=str, default='cosine')
     parser.add_argument('--warmup_epochs', type=int, default=10)
+    parser.add_argument('--early_stop', action='store_true', default=False,
+                        help='enable early stopping (default: False)')
+    parser.add_argument('--early_stop_monitor', type=str, default='val_cindex_ipcw',
+                        choices=['val_cindex', 'val_cindex_ipcw', 'val_BS', 'val_IBS', 'val_iauc', 'total_loss'],
+                        help='metric used by early stopping (default: val_cindex_ipcw)')
+    parser.add_argument('--early_stop_mode', type=str, default='max', choices=['max', 'min'],
+                        help='early stopping mode: max or min (default: max)')
+    parser.add_argument('--early_stop_patience', type=int, default=5,
+                        help='epochs to wait for improvement before stopping (default: 5)')
+    parser.add_argument('--early_stop_min_delta', type=float, default=1e-3,
+                        help='minimum improvement to reset patience (default: 1e-3)')
 
     #---> model related
     parser.add_argument('--fusion', type=str, default=None)
