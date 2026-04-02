@@ -115,7 +115,7 @@ TOP_K = 100
 
 # 基因频次阈值（用于最终特征导出规则）
 # - <= 1: 按频次排序输出前 TOP_K 个基因
-# - > 1 : 输出“出现频次 > 该阈值”的所有基因
+# - > 1 : 输出“出现频次 >= 该阈值”的所有基因
 GENE_FREQ_THRESHOLD = 1
 
 # 随机种子
@@ -385,7 +385,7 @@ def run_stable_genes_pipeline():
     if GENE_FREQ_THRESHOLD <= 1:
         print(f"  基因筛选规则: 频次Top {TOP_K}（GENE_FREQ_THRESHOLD={GENE_FREQ_THRESHOLD}）")
     else:
-        print(f"  基因筛选规则: 保留频次 > {GENE_FREQ_THRESHOLD} 的基因")
+        print(f"  基因筛选规则: 保留频次 >= {GENE_FREQ_THRESHOLD} 的基因")
     print(f"  输出目录: {OUTPUT_DIR}")
     print("=" * 70)
 
@@ -473,8 +473,8 @@ def run_stable_genes_pipeline():
             selected_genes = sorted_genes[:TOP_K]
             select_rule_desc = f"Top {TOP_K} 基因 (按出现频率排序)"
         else:
-            selected_genes = [g for g in sorted_genes if g[1] > GENE_FREQ_THRESHOLD]
-            select_rule_desc = f"出现频次 > {GENE_FREQ_THRESHOLD} 的基因"
+            selected_genes = [g for g in sorted_genes if g[1] >= GENE_FREQ_THRESHOLD]
+            select_rule_desc = f"出现频次 >= {GENE_FREQ_THRESHOLD} 的基因"
 
         if len(selected_genes) == 0:
             raise ValueError(
