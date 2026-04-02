@@ -9,7 +9,7 @@
 ALL_CANCERS=("brca" "blca" "hnsc" "stad" "coadread")
 
 if [ -z "$1" ]; then
-    echo "No cancer type specified, running all supported studies."
+    echo "未指定癌症类型，将运行所有支持的癌种。"
     CANCERS_TO_RUN=("${ALL_CANCERS[@]}")
 else
     CANCERS_TO_RUN=("$@")
@@ -20,7 +20,7 @@ TODAY=$(date +%Y-%m-%d)
 for STUDY in "${CANCERS_TO_RUN[@]}"; do
     echo ""
     echo "################################################################"
-    echo "### Running study: ${STUDY^^}"
+    echo "### 开始处理癌种: ${STUDY^^}"
     echo "################################################################"
 
     LABEL_FILE="datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv"
@@ -42,9 +42,9 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
 
     mkdir -p "${LOG_DIR}" "${REPORT_DIR}" "${ABLRESULTS_DIR}"/{gene,fusion}
 
-    echo "Start simplified ablation: ${STUDY}"
-    echo "Date: ${TODAY}"
-    echo "Log: ${MAIN_LOG}"
+    echo "开始简化消融实验: ${STUDY}"
+    echo "日期: ${TODAY}"
+    echo "日志: ${MAIN_LOG}"
     echo "=============================================="
 
     export STUDY
@@ -53,27 +53,27 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
     export ABLRESULTS_DIR
 
     if [ ! -d "${SPLIT_DIR}" ]; then
-        echo "ERROR: split directory not found: ${SPLIT_DIR}"
-        echo "Run first: python3 preprocessing/CGI/preprocess_test.py"
+        echo "错误: 找不到划分目录: ${SPLIT_DIR}"
+        echo "请先运行: python3 preprocessing/CGI/preprocess_test.py"
         exit 1
     fi
 
     check_features() {
         local all_exist=true
-        echo "Checking stable feature files for ${STUDY^^}..."
+        echo "检查 ${STUDY^^} 的 stable 特征文件..."
         for fold in $(seq 0 $((K_FOLDS-1))); do
             local file="${FEATURE_DIR}/fold_${fold}_genes.csv"
             if [ -f "${file}" ]; then
-                echo "  OK fold ${fold}: $(basename "${file}")"
+                echo "  成功 Fold ${fold}: $(basename "${file}")"
             else
-                echo "  MISSING fold ${fold}: $(basename "${file}")"
+                echo "  缺失 Fold ${fold}: $(basename "${file}")"
                 all_exist=false
             fi
         done
 
         if [ "${all_exist}" = false ]; then
-            echo "ERROR: stable feature files are incomplete."
-            echo "Run first: python3 preprocessing/CGI_py/find_genes_stable.py"
+            echo "错误: stable 特征文件不完整。"
+            echo "请先运行: python3 preprocessing/CGI_py/find_genes_stable.py"
             exit 1
         fi
     }
@@ -91,9 +91,9 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
             local results_dir="${BATCH_DIRS[$idx]}"
             if ! wait "${pid}"; then
                 status=1
-                echo "  FAIL fold ${fold}: training process exited with error" | tee -a "${log_file}"
+                echo "  失败 Fold ${fold}: 训练进程异常退出" | tee -a "${log_file}"
                 if [ -f "${results_dir}/.failure_reason" ]; then
-                    echo "  Failure reason for fold ${fold}:" | tee -a "${log_file}"
+                    echo "  Fold ${fold} 失败原因:" | tee -a "${log_file}"
                     sed 's/^/    /' "${results_dir}/.failure_reason" | tee -a "${log_file}"
                 fi
             fi
@@ -133,7 +133,7 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
             rm -f "${run_marker}" "${exit_code_file}" "${success_marker}" "${failed_marker}" "${reason_file}"
             date +%s > "${run_marker}"
 
-            echo "  Launch fold ${fold}..." | tee -a "${log_file}"
+            echo "  启动 Fold ${fold}..." | tee -a "${log_file}"
 
             (
                 python3 main.py \
@@ -189,7 +189,7 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
             ((running_jobs++))
 
             if [ ${running_jobs} -ge ${MAX_JOBS} ]; then
-                echo "  Reached max parallel jobs ${MAX_JOBS}, waiting..." | tee -a "${log_file}"
+                echo "  达到最大并发数 ${MAX_JOBS}，开始等待..." | tee -a "${log_file}"
                 if ! run_batch_wait "${log_file}" "${pids[@]}"; then
                     mode_failed=1
                 fi
@@ -209,27 +209,27 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
         for fold in "${folds_seen[@]}"; do
             local results_dir="${ABLRESULTS_DIR}/${results_subdir}/fold_${fold}"
             if [ ! -f "${results_dir}/.run_succeeded" ]; then
-                echo "  FAIL fold ${fold}: no success marker for current run" | tee -a "${log_file}"
+                echo "  失败 Fold ${fold}: 本次运行未生成成功标记" | tee -a "${log_file}"
                 if [ -f "${results_dir}/.failure_reason" ]; then
-                    echo "  Failure reason for fold ${fold}:" | tee -a "${log_file}"
+                    echo "  Fold ${fold} 失败原因:" | tee -a "${log_file}"
                     sed 's/^/    /' "${results_dir}/.failure_reason" | tee -a "${log_file}"
                 fi
                 mode_failed=1
             fi
         done
 
-        echo "  Completed mode: ${mode_name}" | tee -a "${log_file}"
+        echo "  模式完成: ${mode_name}" | tee -a "${log_file}"
         return ${mode_failed}
     }
 
     GENE_LOG="${ABLRESULTS_DIR}/gene_training.log"
     if ! run_mode "Gene Only" 2 "gene" "${GENE_LOG}"; then
-        echo "ERROR: Gene Only training failed. Stop before summary to avoid reading stale results." | tee -a "${GENE_LOG}" "${MAIN_LOG}"
+        echo "错误: Gene Only 训练失败。停止汇总，避免读取旧结果。" | tee -a "${GENE_LOG}" "${MAIN_LOG}"
         exit 1
     fi
 
     echo "" | tee -a "${GENE_LOG}"
-    echo "Summarizing Gene Only results..." | tee -a "${GENE_LOG}"
+    echo "开始汇总 Gene Only 结果..." | tee -a "${GENE_LOG}"
     export GENE_SUMMARY="${ABLRESULTS_DIR}/gene/summary.csv"
 
     python3 << 'EOF' | tee -a "${GENE_LOG}"
@@ -253,7 +253,7 @@ for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
     success_marker = os.path.join(fold_dir, '.run_succeeded')
     run_started = os.path.join(fold_dir, '.run_started')
     if not os.path.exists(success_marker):
-        print(f"  x Fold {fold_num}: current run did not succeed, skip stale files")
+        print(f"  跳过 Fold {fold_num}: 本次运行未成功，不读取旧结果")
         continue
 
     run_started_ts = os.path.getmtime(run_started) if os.path.exists(run_started) else 0
@@ -265,7 +265,7 @@ for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
         df = pd.read_csv(f)
         df['fold'] = fold_num
         dfs.append(df)
-        print(f"  ok Fold {fold_num}: {os.path.basename(f)}")
+        print(f"  成功 Fold {fold_num}: {os.path.basename(f)}")
         continue
 
     summary_files = [p for p in glob.glob(f"{fold_dir}/**/summary.csv", recursive=True)
@@ -276,29 +276,29 @@ for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
         if 'folds' in df.columns:
             df['fold'] = fold_num
         dfs.append(df)
-        print(f"  ok Fold {fold_num}: {os.path.basename(f)}")
+        print(f"  成功 Fold {fold_num}: {os.path.basename(f)}")
     else:
-        print(f"  x Fold {fold_num}: no fresh summary generated in current run")
+        print(f"  失败 Fold {fold_num}: 本次运行未生成新的 summary 文件")
 
 if dfs:
     result = pd.concat(dfs).sort_values('fold')
     result.to_csv(summary_path, index=False)
-    print(f"OK Gene Only summary: {len(dfs)}/5 folds")
-    print(f"Mean C-Index: {result['val_cindex'].mean():.4f}")
+    print(f"Gene Only 汇总完成: {len(dfs)}/5 折")
+    print(f"平均 C-Index: {result['val_cindex'].mean():.4f}")
 else:
-    print("ERROR: no usable Gene Only results from current run")
+    print("错误: 本次运行没有可用的 Gene Only 结果")
     pd.DataFrame(columns=['fold', 'val_cindex']).to_csv(summary_path, index=False)
     raise SystemExit(1)
 EOF
 
     FUSION_LOG="${ABLRESULTS_DIR}/fusion_training.log"
     if ! run_mode "Fusion" 3 "fusion" "${FUSION_LOG}"; then
-        echo "ERROR: Fusion training failed. Stop before summary to avoid reading stale results." | tee -a "${FUSION_LOG}" "${MAIN_LOG}"
+        echo "错误: Fusion 训练失败。停止汇总，避免读取旧结果。" | tee -a "${FUSION_LOG}" "${MAIN_LOG}"
         exit 1
     fi
 
     echo "" | tee -a "${FUSION_LOG}"
-    echo "Summarizing Fusion results..." | tee -a "${FUSION_LOG}"
+    echo "开始汇总 Fusion 结果..." | tee -a "${FUSION_LOG}"
     export FUSION_SUMMARY="${ABLRESULTS_DIR}/fusion/summary.csv"
 
     python3 << 'EOF' | tee -a "${FUSION_LOG}"
@@ -322,7 +322,7 @@ for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
     success_marker = os.path.join(fold_dir, '.run_succeeded')
     run_started = os.path.join(fold_dir, '.run_started')
     if not os.path.exists(success_marker):
-        print(f"  x Fold {fold_num}: current run did not succeed, skip stale files")
+        print(f"  跳过 Fold {fold_num}: 本次运行未成功，不读取旧结果")
         continue
 
     run_started_ts = os.path.getmtime(run_started) if os.path.exists(run_started) else 0
@@ -334,7 +334,7 @@ for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
         df = pd.read_csv(f)
         df['fold'] = fold_num
         dfs.append(df)
-        print(f"  ok Fold {fold_num}: {os.path.basename(f)}")
+        print(f"  成功 Fold {fold_num}: {os.path.basename(f)}")
         continue
 
     summary_files = [p for p in glob.glob(f"{fold_dir}/**/summary.csv", recursive=True)
@@ -345,17 +345,17 @@ for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
         if 'folds' in df.columns:
             df['fold'] = fold_num
         dfs.append(df)
-        print(f"  ok Fold {fold_num}: {os.path.basename(f)}")
+        print(f"  成功 Fold {fold_num}: {os.path.basename(f)}")
     else:
-        print(f"  x Fold {fold_num}: no fresh summary generated in current run")
+        print(f"  失败 Fold {fold_num}: 本次运行未生成新的 summary 文件")
 
 if dfs:
     result = pd.concat(dfs).sort_values('fold')
     result.to_csv(summary_path, index=False)
-    print(f"OK Fusion summary: {len(dfs)}/5 folds")
-    print(f"Mean C-Index: {result['val_cindex'].mean():.4f}")
+    print(f"Fusion 汇总完成: {len(dfs)}/5 折")
+    print(f"平均 C-Index: {result['val_cindex'].mean():.4f}")
 else:
-    print("ERROR: no usable Fusion results from current run")
+    print("错误: 本次运行没有可用的 Fusion 结果")
     pd.DataFrame(columns=['fold', 'val_cindex']).to_csv(summary_path, index=False)
     raise SystemExit(1)
 EOF
@@ -377,7 +377,7 @@ gene_summary_path = f"{ablation_dir}/gene/summary.csv"
 fusion_summary_path = f"{ablation_dir}/fusion/summary.csv"
 
 if not os.path.exists(gene_summary_path) or not os.path.exists(fusion_summary_path):
-    raise SystemExit("Missing mode summaries; abort final comparison.")
+    raise SystemExit("错误: 缺少模式汇总文件，停止生成最终对比结果。")
 
 gene_summary = pd.read_csv(gene_summary_path)
 fusion_summary = pd.read_csv(fusion_summary_path)
@@ -399,27 +399,27 @@ gene_mean = df['Gene_C_Index'].mean()
 fusion_mean = df['Fusion_C_Index'].mean()
 
 print("=" * 50)
-print("Simplified ablation summary")
+print("简化消融实验结果汇总")
 print(df.to_string(index=False))
 print("=" * 50)
-print(f"Gene Only mean C-Index: {gene_mean:.4f}")
-print(f"Fusion mean C-Index:    {fusion_mean:.4f}")
+print(f"Gene Only 平均 C-Index: {gene_mean:.4f}")
+print(f"Fusion 平均 C-Index:    {fusion_mean:.4f}")
 if gene_mean > 0:
     improvement = ((fusion_mean - gene_mean) / gene_mean) * 100
-    print(f"Fusion vs Gene Only: {improvement:+.2f}%")
-print(f"Saved comparison: {final_csv}")
+    print(f"Fusion 相对 Gene Only 提升: {improvement:+.2f}%")
+print(f"已保存对比结果: {final_csv}")
 EOF
 
     echo ""
-    echo "Study completed: ${STUDY}"
-    echo "Results directory: ${ABLRESULTS_DIR}"
-    echo "Comparison table: ${FINAL_CSV}"
-    echo "Report file: ${REPORT_CSV}"
+    echo "癌种处理完成: ${STUDY}"
+    echo "结果目录: ${ABLRESULTS_DIR}"
+    echo "对比表: ${FINAL_CSV}"
+    echo "报告文件: ${REPORT_CSV}"
 done
 
 echo ""
 echo "################################################################"
-echo "### All simplified ablation runs completed"
+echo "### 所有简化消融实验已完成"
 echo "################################################################"
-echo "Results directory: results/ablation/"
-echo "Report directory: report/"
+echo "结果目录: results/ablation/"
+echo "报告目录: report/"
