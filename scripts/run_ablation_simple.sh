@@ -30,7 +30,7 @@ REG=0.00001
 # 编码器 dropout：大一些抑制过拟合，小一些提升拟合能力。
 ENCODER_DROPOUT=0.25
 # 并发任务数：当前建议 1（稳定优先，便于定位单折错误）。
-MAX_JOBS=1
+MAX_JOBS=3
 
 # 基因维度（特征数）控制：对应 stable top-k 特征实验入口。
 # 该值主要用于实验记录和打印，实际生效仍取决于你生成的特征文件内容。
@@ -39,7 +39,7 @@ GENE_TOPK=100
 # -------------------- 早停配置区 --------------------
 # 注意：只有当 Python 训练入口支持这些参数时，才会真正生效。
 # 早停总开关：1=启用，0=关闭。
-EARLY_STOP_ENABLE=1
+EARLY_STOP_ENABLE=0
 # 监控指标：推荐 val_cindex_ipcw（生存分析更稳健）。
 EARLY_STOP_MONITOR="val_cindex_ipcw"
 # 指标方向：max 表示指标越大越好；min 表示越小越好（如 loss）。
