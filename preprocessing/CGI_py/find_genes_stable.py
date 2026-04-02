@@ -245,9 +245,10 @@ def load_full_data(cancer_type: str) -> tuple:
         cancer_type: 癌症类型
 
     返回:
-        tuple: (data_matrix, gene_names)
+        tuple: (data_matrix, gene_names, patient_ids)
             - data_matrix: 完整数据矩阵 (n_samples, n_genes+1)，最后一列是time
             - gene_names: 基因名列表
+            - patient_ids: 与 data_matrix 行一一对应的 patient_id 列表
     """
     # 完整数据文件路径（注意：在 coadread 子目录下）
     data_dir = '/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI/data'
@@ -255,18 +256,19 @@ def load_full_data(cancer_type: str) -> tuple:
 
     if not os.path.exists(full_data_path):
         print(f"    警告: 未找到完整数据文件 {full_data_path}")
-        return None, None
+        return None, None, None
 
     df = pd.read_csv(full_data_path)
 
     # 提取基因名（跳过第一列 patient_id 和最后一列 time）
     gene_names = df.columns[1:-1].tolist()
+    patient_ids = df['patient_id'].astype(str).tolist()
 
     # 提取数据矩阵（跳过 patient_id 列，保留基因和 time）
     data_matrix = df.iloc[:, 1:].values  # shape: (n_samples, n_genes+1)
 
     print(f"    已加载完整数据: {data_matrix.shape[0]} 样本, {len(gene_names)} 基因")
-    return data_matrix, gene_names
+    return data_matrix, gene_names, patient_ids
 
 
 def load_gene_names(cancer_type: str) -> list:
@@ -510,24 +512,35 @@ def run_stable_genes_pipeline():
         sample_ids = load_all_sample_ids(CANCER_TYPE, fold, DATA_DIR)
 
         # 加载完整数据（包含所有样本）
-        full_data, gene_names_all = load_full_data(CANCER_TYPE)
+        full_data, gene_names_all, patient_ids_all = load_full_data(CANCER_TYPE)
 
-        if sample_ids is not None and full_data is not None:
+        if sample_ids is not None and full_data is not None and patient_ids_all is not None:
             # 获取top基因索引列表
             top_gene_indices = [g[0] for g in top_genes]
 
             # 获取数据矩阵（不含标签列time）
             data_for_csv = full_data[:, :-1]  # 不包含最后一列（time）
 
-            # 对齐样本数量
-            n_samples = min(len(sample_ids), data_for_csv.shape[0])
+            # 显式按 patient_id 对齐，避免假设 full_data 行顺序与 split 顺序一致
+            patient_to_idx = {pid: idx for idx, pid in enumerate(patient_ids_all)}
+            missing_sample_ids = [sid for sid in sample_ids if sid not in patient_to_idx]
+            if missing_sample_ids:
+                preview = ', '.join(missing_sample_ids[:5])
+                raise KeyError(
+                    f"Fold {fold} has {len(missing_sample_ids)} sample IDs missing from full data. "
+                    f"Examples: {preview}"
+                )
+
+            aligned_data = np.zeros((len(sample_ids), data_for_csv.shape[1]), dtype=data_for_csv.dtype)
+            for i, sample_id in enumerate(sample_ids):
+                aligned_data[i, :] = data_for_csv[patient_to_idx[sample_id], :]
 
             # 保存CSV
             csv_file = os.path.join(CSV_OUTPUT_DIR, f'fold_{fold}_genes.csv')
             save_stable_genes_csv(
-                data_for_csv[:n_samples, :],
+                aligned_data,
                 top_gene_indices,
-                sample_ids[:n_samples],
+                sample_ids,
                 csv_file,
                 gene_names_all
             )
