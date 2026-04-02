@@ -622,7 +622,7 @@ class SurvivalDatasetFactory:
 
         # 路径4: features/stable_{study}/fold_{fold}_genes.csv (最高优先级)
         fold_feature_file_stable = os.path.join(
-            f'features/stable/{study_name}/fold_{fold}_genes.csv'
+            f'preprocessing/CGI_py/features/stable/{study_name}/fold_{fold}_genes.csv'
         )
 
         # 路径5: CGI 特征文件 (例如 preprocessing/CGI/data/coadread_found_genes/coadread_found_Genes_fold0.csv)

@@ -79,7 +79,7 @@ from find_genes_gci import load_data
 # ================================================================================
 
 # 癌症类型 (brca, blca, hnsc, stad, coadread)
-CANCER_TYPE = 'stad' 
+CANCER_TYPE = 'brca' 
 
 # 数据目录
 DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/CGI_nested_cv/{CANCER_TYPE}'
