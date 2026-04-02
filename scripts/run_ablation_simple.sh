@@ -1,162 +1,207 @@
 #!/bin/bash
 
-# ====================================================================
+# ============================================================
 # 简化消融实验脚本（CGI版）
-# 只运行 Gene Only 和 Fusion 两种模式
-# ====================================================================
-#
-# 运行方法:
-#   bash scripts/run_ablation_simple.sh coadread
-#
-# 前置要求:
-#   1. 运行 preprocess_test.py 生成 CGI 数据和划分
-#   2. 运行 CGI 算法筛选基因
-#   3. 运行 extract_features.py 生成基因特征文件
-#
-# ====================================================================
+# 仅运行：Gene Only（ab_model=2）和 Fusion（ab_model=3）
+# ============================================================
 
-# 检查参数
-# 癌症种类列表
+set -u
+
+# -------------------- 癌种参数 --------------------
 ALL_CANCERS=("brca" "blca" "hnsc" "stad" "coadread")
-
-if [ -z "$1" ]; then
-    echo "未指定癌症种类，将运行所有癌症种类..."
+if [ $# -eq 0 ]; then
+    echo "未指定癌种，将运行全部癌种：${ALL_CANCERS[*]}"
     CANCERS_TO_RUN=("${ALL_CANCERS[@]}")
 else
-    # 解析参数（支持多个癌症种类）
     CANCERS_TO_RUN=("$@")
 fi
+
+# -------------------- 训练配置区 --------------------
+# 随机种子：保证实验可复现；改动后会改变每折采样与初始化结果。
+SEED=42
+# 交叉验证折数：需与 split 文件保持一致（当前项目是 5 折）。
+K_FOLDS=5
+# 最大 epoch：如果不开早停，训练会完整跑到这个轮次。
+MAX_EPOCHS=20
+# 全局学习率：建议与 reg/dropout 联合调参，不建议单独大幅增减。
+LR=0.00005
+# 正则强度（weight decay/L2）：大一些更抗过拟合，小一些更容易拟合训练集。
+REG=0.00001
+# 编码器 dropout：大一些抑制过拟合，小一些提升拟合能力。
+ENCODER_DROPOUT=0.25
+# 并发任务数：当前建议 1（稳定优先，便于定位单折错误）。
+MAX_JOBS=1
+
+# 基因维度（特征数）控制：对应 stable top-k 特征实验入口。
+# 该值主要用于实验记录和打印，实际生效仍取决于你生成的特征文件内容。
+GENE_TOPK=100
+
+# -------------------- 早停配置区 --------------------
+# 注意：只有当 Python 训练入口支持这些参数时，才会真正生效。
+# 早停总开关：1=启用，0=关闭。
+EARLY_STOP_ENABLE=1
+# 监控指标：推荐 val_cindex_ipcw（生存分析更稳健）。
+EARLY_STOP_MONITOR="val_cindex_ipcw"
+# 指标方向：max 表示指标越大越好；min 表示越小越好（如 loss）。
+EARLY_STOP_MODE="max"
+# 耐心轮次：连续多少个 epoch 没有达到“有效提升”后触发停止。
+EARLY_STOP_PATIENCE=5
+# 最小提升阈值：小于该提升量视为“无改进”。
+EARLY_STOP_MIN_DELTA=0.001
+
+# -------------------- 公共路径 --------------------
 TODAY=$(date +%Y-%m-%d)
 
-# ==================== 主循环 ====================
-for STUDY in "${CANCERS_TO_RUN[@]}"; do
-    echo ""
-    echo "################################################################"
-    echo "### 开始处理癌症类型: ${STUDY^^}"
-    echo "################################################################"
-
-# ==================== 数据路径配置 ====================
-
-# 临床标签文件
-LABEL_FILE="datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv"
-
-# 交叉验证划分文件（使用CGI重新划分的版本）
-SPLIT_DIR="splits/CGI_nested_cv/${STUDY}"
-
-# CGI筛选的基因特征文件
-# FEATURE_DIR="preprocessing/CGI/data/${STUDY}_found_genes"
-# FEATURE_FILE="${STUDY}_found_Genes_fold"
-
-# 稳定特征文件（新地址）
-FEATURE_DIR="features/stable/${STUDY}"
-
-# RNA原始数据
-OMICS_DIR="datasets_csv/raw_rna_data/combine/${STUDY}"
-
-# PT数据文件
-DATA_ROOT_DIR="data/${STUDY}/pt_files"
-
-# 模型与输出路径
-BIOBERT_DIR="biobert"
-ABLRESULTS_DIR="results/ablation/${STUDY}"
-LOG_DIR="log/${TODAY}/${STUDY}"
-REPORT_DIR="report"
-
-# 训练超参数
-SEED=42
-K_FOLDS=5
-EPOCHS=20
-LR=0.00005
-MAX_JOBS=3  # 只运行两种模式，降低并发
-
-# =========================================================
-
-# 创建目录
-mkdir -p "${LOG_DIR}" "${REPORT_DIR}" "${ABLRESULTS_DIR}"/{gene,fusion}
-
-MAIN_LOG="${LOG_DIR}/ablation_simple.log"
-
-echo "🚀 开始简化消融实验: ${STUDY}"
-echo "📅 日期: ${TODAY}"
-echo "📁 日志: ${MAIN_LOG}"
-echo "=============================================="
-
-export STUDY
-export LABEL_FILE
-export SPLIT_DIR
-export ABLRESULTS_DIR
-
-# 检查划分文件
-if [ ! -d "${SPLIT_DIR}" ]; then
-    echo "❌ 错误: 找不到划分文件目录 ${SPLIT_DIR}"
-    echo "请先运行: python3 preprocessing/CGI/preprocess_test.py"
-    exit 1
-fi
-
-# 检查特征文件
-check_features() {
-    local all_exist=true
-    echo "🔍 检查 ${STUDY^^} 的稳定基因特征文件..."
-    for fold in $(seq 0 $((K_FOLDS-1))); do
-        local file="${FEATURE_DIR}/fold_${fold}_genes.csv"
-        if [ -f "$file" ]; then
-            echo "   ✓ Fold ${fold}: $(basename $file) 存在"
-        else
-            echo "   ✗ Fold ${fold}: $(basename $file) 缺失!"
-            all_exist=false
-        fi
-    done
-    if [ "$all_exist" = false ]; then
-        echo "❌ 错误: 特征文件不完整"
-        echo "请先运行: python3 preprocessing/CGI/extract_features.py"
-        exit 1
+supports_early_stop() {
+    local args_file="utils/process_args.py"
+    if [ ! -f "$args_file" ]; then
+        return 1
     fi
-    echo "✅ CGI 特征文件检查通过"
+    if grep -q "add_argument('--early_stop" "$args_file"; then
+        return 0
+    fi
+    return 1
 }
 
-check_features
+print_run_config() {
+    local study="$1"
+    local feature_dir="$2"
+    local sample_feature_file="${feature_dir}/fold_0_genes.csv"
+    local gene_dim="未知"
 
-# ==================== 辅助函数 ====================
+    if [ -f "$sample_feature_file" ]; then
+        gene_dim=$(python3 - << 'PY'
+import csv
+import os
+fp = os.environ.get("SAMPLE_FEATURE_FILE", "")
+try:
+    with open(fp, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f)
+        header = next(reader)
+    # 第一列通常是基因名，其余列是样本；基因维度应为行数，无法仅通过表头确定。
+    # 这里输出“样本列数”用于检查数据规模。
+    sample_cols = max(len(header) - 1, 0)
+    print(f"样本列数={sample_cols}")
+except Exception:
+    print("未知")
+PY
+)
+    fi
+
+    echo "=============================================================="
+    echo "当前癌种：${study^^}"
+    echo "随机种子：${SEED}"
+    echo "折数：${K_FOLDS}"
+    echo "最大训练轮次：${MAX_EPOCHS}"
+    echo "学习率（lr）：${LR}"
+    echo "权重衰减（reg）：${REG}"
+    echo "Dropout（encoder_dropout）：${ENCODER_DROPOUT}"
+    echo "目标基因数（GENE_TOPK）：${GENE_TOPK}"
+    echo "特征目录：${feature_dir}"
+    echo "特征规模检查：${gene_dim}"
+    echo "早停开关：${EARLY_STOP_ENABLE}"
+    echo "早停监控指标：${EARLY_STOP_MONITOR}"
+    echo "早停模式：${EARLY_STOP_MODE}"
+    echo "早停耐心轮次：${EARLY_STOP_PATIENCE}"
+    echo "早停最小提升：${EARLY_STOP_MIN_DELTA}"
+    echo "=============================================================="
+}
+
+check_required_paths() {
+    local split_dir="$1"
+    local feature_dir="$2"
+    local study="$3"
+
+    if [ ! -d "$split_dir" ]; then
+        echo "错误：找不到划分目录：$split_dir"
+        echo "请先执行：python3 preprocessing/CGI/preprocess_test.py"
+        return 1
+    fi
+
+    local missing=0
+    echo "检查 ${study^^} 的稳定基因特征文件..."
+    for fold in $(seq 0 $((K_FOLDS - 1))); do
+        local f="${feature_dir}/fold_${fold}_genes.csv"
+        if [ -f "$f" ]; then
+            echo "  Fold ${fold}：存在（$(basename "$f")）"
+        else
+            echo "  Fold ${fold}：缺失（$(basename "$f")）"
+            missing=1
+        fi
+    done
+    if [ "$missing" -ne 0 ]; then
+        echo "错误：稳定特征文件不完整，终止运行。"
+        return 1
+    fi
+    return 0
+}
+
+build_early_stop_args() {
+    EXTRA_ARGS=()
+    if [ "$EARLY_STOP_ENABLE" -eq 1 ]; then
+        if supports_early_stop; then
+            EXTRA_ARGS+=("--early_stop")
+            EXTRA_ARGS+=("--early_stop_monitor" "$EARLY_STOP_MONITOR")
+            EXTRA_ARGS+=("--early_stop_mode" "$EARLY_STOP_MODE")
+            EXTRA_ARGS+=("--early_stop_patience" "$EARLY_STOP_PATIENCE")
+            EXTRA_ARGS+=("--early_stop_min_delta" "$EARLY_STOP_MIN_DELTA")
+            echo "已启用早停：训练入口支持早停参数。"
+        else
+            echo "警告：当前训练入口未检测到早停参数定义，早停配置仅打印，不会生效。"
+        fi
+    else
+        echo "早停已关闭。"
+    fi
+}
+
 run_mode() {
-    local mode_name=$1
-    local ab_model=$2
-    local results_subdir=$3
-    local log_file=$4
+    local study="$1"
+    local mode_name="$2"
+    local ab_model="$3"
+    local results_subdir="$4"
+    local label_file="$5"
+    local split_dir="$6"
+    local omics_dir="$7"
+    local data_root_dir="$8"
+    local abresults_dir="$9"
 
-    echo "" | tee -a "${log_file}"
-    echo "==============================================" | tee -a "${log_file}"
-    echo "🧬 ${mode_name}" | tee -a "${log_file}"
-    echo "==============================================" | tee -a "${log_file}"
+    local mode_dir="${abresults_dir}/${results_subdir}"
+    local mode_log="${abresults_dir}/${results_subdir}_training.log"
+    mkdir -p "$mode_dir"
 
-    local fold=0
-    local running_jobs=0
+    echo "" | tee -a "$mode_log"
+    echo "==============================================================" | tee -a "$mode_log"
+    echo "开始训练模式：${mode_name}" | tee -a "$mode_log"
+    echo "输出目录：${mode_dir}" | tee -a "$mode_log"
+    echo "==============================================================" | tee -a "$mode_log"
 
-    for fold in $(seq 0 $((K_FOLDS-1))); do
-        local RESULTS_DIR="${ABLRESULTS_DIR}/${results_subdir}/fold_${fold}"
-        local fold_log="${RESULTS_DIR}/training.log"
-        mkdir -p "${RESULTS_DIR}"
+    local failed_folds=()
+    for fold in $(seq 0 $((K_FOLDS - 1))); do
+        local fold_dir="${mode_dir}/fold_${fold}"
+        local fold_log="${fold_dir}/training.log"
+        mkdir -p "$fold_dir"
 
-        echo "  └─ 启动 Fold ${fold}..." | tee -a "${log_file}"
+        echo "启动 Fold ${fold}..." | tee -a "$mode_log"
 
-        python3 main.py \
-            --study tcga_${STUDY} \
-            --k_start ${fold} \
-            --k_end $((fold + 1)) \
-            --split_dir "${SPLIT_DIR}" \
-            --results_dir "${RESULTS_DIR}" \
-            --seed ${SEED} \
-            --label_file "${LABEL_FILE}" \
+        python3 -u main.py \
+            --study "tcga_${study}" \
+            --k_start "$fold" \
+            --k_end "$((fold + 1))" \
+            --split_dir "$split_dir" \
+            --results_dir "$fold_dir" \
+            --seed "$SEED" \
+            --label_file "$label_file" \
             --task survival \
             --n_classes 4 \
             --modality snn \
-            --omics_dir "${OMICS_DIR}" \
-            --data_root_dir "${DATA_ROOT_DIR}" \
+            --omics_dir "$omics_dir" \
+            --data_root_dir "$data_root_dir" \
             --label_col survival_months \
             --type_of_path combine \
-            --max_epochs ${EPOCHS} \
-            --lr ${LR} \
+            --max_epochs "$MAX_EPOCHS" \
+            --lr "$LR" \
             --opt adam \
-            --reg 0.00001 \
+            --reg "$REG" \
             --alpha_surv 0.5 \
             --weighted_sample \
             --batch_size 1 \
@@ -166,217 +211,197 @@ run_mode() {
             --wsi_projection_dim 256 \
             --encoding_layer_1_dim 8 \
             --encoding_layer_2_dim 16 \
-            --encoder_dropout 0.25 \
-            --ab_model ${ab_model} \
-            > "${fold_log}" 2>&1 &
+            --encoder_dropout "$ENCODER_DROPOUT" \
+            --ab_model "$ab_model" \
+            "${EXTRA_ARGS[@]}" \
+            > "$fold_log" 2>&1
 
-        local pid=$!
-        echo "    PID: ${pid}" >> "${log_file}"
-
-        ((running_jobs++))
-
-        if [ ${running_jobs} -ge ${MAX_JOBS} ]; then
-            echo "  └─ 达到最大并发数 ${MAX_JOBS}，等待..." | tee -a "${log_file}"
-            wait
-            running_jobs=0
+        local code=$?
+        if [ "$code" -ne 0 ]; then
+            echo "错误：Fold ${fold} 训练失败，退出码=${code}，日志：${fold_log}" | tee -a "$mode_log"
+            failed_folds+=("$fold")
+            continue
         fi
+
+        local partial_count
+        partial_count=$(find "$fold_dir" -type f -name "summary_partial_*.csv" | wc -l | tr -d ' ')
+        if [ "$partial_count" -eq 0 ]; then
+            echo "错误：Fold ${fold} 未生成 summary_partial_*.csv，判定为失败。" | tee -a "$mode_log"
+            failed_folds+=("$fold")
+            continue
+        fi
+
+        echo "Fold ${fold} 完成。" | tee -a "$mode_log"
     done
 
-    if [ ${running_jobs} -gt 0 ]; then
-        wait
+    if [ "${#failed_folds[@]}" -gt 0 ]; then
+        echo "模式 ${mode_name} 存在失败折：${failed_folds[*]}" | tee -a "$mode_log"
+    else
+        echo "模式 ${mode_name} 全部 Fold 训练成功。" | tee -a "$mode_log"
     fi
-
-    echo "  └─ ${mode_name} 所有 Fold 完成" | tee -a "${log_file}"
 }
 
-# ==================== 1. Gene Only ====================
-GENE_LOG="${ABLRESULTS_DIR}/gene_training.log"
-run_mode "Gene Only (仅基因)" 2 "gene" "${GENE_LOG}"
+merge_mode_summary() {
+    local mode_dir="$1"
+    local out_csv="$2"
+    local mode_name="$3"
 
-# 汇总 Gene Only 结果
-echo "" | tee -a "${GENE_LOG}"
-echo "📊 汇总 Gene Only 结果..." | tee -a "${GENE_LOG}"
-export GENE_SUMMARY="${ABLRESULTS_DIR}/gene/summary.csv"
-wait
-
-python3 << 'EOF' | tee -a "${GENE_LOG}"
-import pandas as pd
+    python3 - << 'PY'
 import glob
 import os
-import time
-
-base_path = os.environ.get('ABLRESULTS_DIR', '')
-results_dir = os.path.join(base_path, 'gene')
-summary_path = os.environ.get('GENE_SUMMARY', '')
-
-dfs = []
-for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
-    if not os.path.isdir(fold_dir):
-        continue
-    try:
-        fold_num = int(fold_dir.split('_')[-1])
-    except:
-        continue
-
-    # 优先查找 summary_partial_*.csv
-    partial_files = glob.glob(f"{fold_dir}/**/summary_partial_*.csv", recursive=True)
-    if partial_files:
-        f = max(partial_files, key=os.path.getmtime)
-        df = pd.read_csv(f)
-        df['fold'] = fold_num
-        dfs.append(df)
-        print(f"  ✓ Fold {fold_num}: {os.path.basename(f)}")
-    else:
-        # 备选查找 summary.csv
-        summary_files = glob.glob(f"{fold_dir}/**/summary.csv", recursive=True)
-        if summary_files:
-            f = max(summary_files, key=os.path.getmtime)
-            df = pd.read_csv(f)
-            # summary.csv 格式: 第一列是 folds
-            if 'folds' in df.columns:
-                df['fold'] = fold_num
-            dfs.append(df)
-            print(f"  ✓ Fold {fold_num}: {os.path.basename(f)} (from summary.csv)")
-        else:
-            print(f"  ✗ Fold {fold_num}: 结果文件缺失")
-
-if dfs:
-    result = pd.concat(dfs).sort_values('fold')
-    result.to_csv(summary_path, index=False)
-    mean_cindex = result['val_cindex'].mean()
-    print(f'✅ Gene Only 汇总: {len(dfs)}/5 折成功, 平均 C-Index: {mean_cindex:.4f}')
-else:
-    print('❌ 错误: 无可用结果')
-    pd.DataFrame(columns=['fold', 'val_cindex']).to_csv(summary_path, index=False)
-EOF
-
-# ==================== 2. Fusion ====================
-FUSION_LOG="${ABLRESULTS_DIR}/fusion_training.log"
-run_mode "Fusion (基因+文本)" 3 "fusion" "${FUSION_LOG}"
-
-# 汇总 Fusion 结果
-echo "" | tee -a "${FUSION_LOG}"
-echo "📊 汇总 Fusion 结果..." | tee -a "${FUSION_LOG}"
-export FUSION_SUMMARY="${ABLRESULTS_DIR}/fusion/summary.csv"
-wait
-
-python3 << 'EOF' | tee -a "${FUSION_LOG}"
 import pandas as pd
-import glob
+
+mode_dir = os.environ["MODE_DIR"]
+out_csv = os.environ["OUT_CSV"]
+mode_name = os.environ["MODE_NAME"]
+k_folds = int(os.environ["K_FOLDS"])
+
+rows = []
+for fold in range(k_folds):
+    fold_dir = os.path.join(mode_dir, f"fold_{fold}")
+    if not os.path.isdir(fold_dir):
+        print(f"{mode_name} Fold {fold}: 目录不存在，跳过")
+        continue
+    partials = sorted(glob.glob(os.path.join(fold_dir, "summary_partial_*.csv")))
+    if not partials:
+        print(f"{mode_name} Fold {fold}: 未找到 summary_partial_*.csv，跳过")
+        continue
+    f = partials[-1]
+    try:
+        df = pd.read_csv(f)
+        if "val_cindex" not in df.columns:
+            print(f"{mode_name} Fold {fold}: 文件缺少 val_cindex 列，跳过")
+            continue
+        val = float(df["val_cindex"].iloc[-1])
+        rows.append({"fold": fold, "val_cindex": val, "source_file": os.path.basename(f)})
+        print(f"{mode_name} Fold {fold}: 已收集 {os.path.basename(f)}")
+    except Exception as e:
+        print(f"{mode_name} Fold {fold}: 读取失败，原因：{e}")
+
+if rows:
+    out_df = pd.DataFrame(rows).sort_values("fold")
+    out_df.to_csv(out_csv, index=False)
+    print(f"{mode_name} 汇总完成：{out_csv}")
+    print(f"{mode_name} 平均 val_cindex: {out_df['val_cindex'].mean():.4f}")
+else:
+    pd.DataFrame(columns=["fold", "val_cindex", "source_file"]).to_csv(out_csv, index=False)
+    print(f"{mode_name} 无可用结果，已写入空汇总：{out_csv}")
+PY
+}
+
+make_final_report() {
+    local abresults_dir="$1"
+    local final_csv="$2"
+    local report_csv="$3"
+
+    python3 - << 'PY'
 import os
-
-base_path = os.environ.get('ABLRESULTS_DIR', '')
-results_dir = os.path.join(base_path, 'fusion')
-summary_path = os.environ.get('FUSION_SUMMARY', '')
-
-dfs = []
-for fold_dir in sorted(glob.glob(f"{results_dir}/fold_*", recursive=True)):
-    if not os.path.isdir(fold_dir):
-        continue
-    try:
-        fold_num = int(fold_dir.split('_')[-1])
-    except:
-        continue
-
-    # 优先查找 summary_partial_*.csv
-    partial_files = glob.glob(f"{fold_dir}/**/summary_partial_*.csv", recursive=True)
-    if partial_files:
-        f = max(partial_files, key=os.path.getmtime)
-        df = pd.read_csv(f)
-        df['fold'] = fold_num
-        dfs.append(df)
-        print(f"  ✓ Fold {fold_num}: {os.path.basename(f)}")
-    else:
-        # 备选查找 summary.csv
-        summary_files = glob.glob(f"{fold_dir}/**/summary.csv", recursive=True)
-        if summary_files:
-            f = max(summary_files, key=os.path.getmtime)
-            df = pd.read_csv(f)
-            if 'folds' in df.columns:
-                df['fold'] = fold_num
-            dfs.append(df)
-            print(f"  ✓ Fold {fold_num}: {os.path.basename(f)} (from summary.csv)")
-        else:
-            print(f"  ✗ Fold {fold_num}: 结果文件缺失")
-
-if dfs:
-    result = pd.concat(dfs).sort_values('fold')
-    result.to_csv(summary_path, index=False)
-    mean_cindex = result['val_cindex'].mean()
-    print(f'✅ Fusion 汇总: {len(dfs)}/5 折成功, 平均 C-Index: {mean_cindex:.4f}')
-else:
-    print('❌ 错误: 无可用结果')
-    pd.DataFrame(columns=['fold', 'val_cindex']).to_csv(summary_path, index=False)
-EOF
-
-# ==================== 生成对比表格 ====================
-echo ""
-echo "=============================================="
-echo "📈 生成对比表格"
-echo "=============================================="
-
-export FINAL_CSV="${ABLRESULTS_DIR}/final_comparison.csv"
-export REPORT_CSV="report/${TODAY}_${STUDY}_ablation_simple.csv"
-
-wait
-
-python3 << EOF | tee -a "${MAIN_LOG}"
-import pandas as pd
 import numpy as np
-import os
+import pandas as pd
 
-study = os.environ.get('STUDY', '')
-ablation_dir = f"results/ablation/{study}"
-final_csv = os.environ.get('FINAL_CSV', '')
-report_csv = os.environ.get('REPORT_CSV', '')
+ab_dir = os.environ["AB_DIR"]
+final_csv = os.environ["FINAL_CSV"]
+report_csv = os.environ["REPORT_CSV"]
+k_folds = int(os.environ["K_FOLDS"])
 
-gene_summary = pd.read_csv(f"{ablation_dir}/gene/summary.csv") if os.path.exists(f"{ablation_dir}/gene/summary.csv") else None
-fusion_summary = pd.read_csv(f"{ablation_dir}/fusion/summary.csv") if os.path.exists(f"{ablation_dir}/fusion/summary.csv") else None
+gene_csv = os.path.join(ab_dir, "gene", "summary.csv")
+fusion_csv = os.path.join(ab_dir, "fusion", "summary.csv")
 
-comparison_data = []
-for fold in range(5):
-    row = {'Fold': fold}
-    if gene_summary is not None:
-        gene_val = gene_summary[gene_summary['fold'] == fold]['val_cindex'].values
-        row['Gene_C_Index'] = gene_val[0] if len(gene_val) > 0 else np.nan
-    if fusion_summary is not None:
-        fusion_val = fusion_summary[fusion_summary['fold'] == fold]['val_cindex'].values
-        row['Fusion_C_Index'] = fusion_val[0] if len(fusion_val) > 0 else np.nan
-    comparison_data.append(row)
+gene_df = pd.read_csv(gene_csv) if os.path.exists(gene_csv) else pd.DataFrame()
+fusion_df = pd.read_csv(fusion_csv) if os.path.exists(fusion_csv) else pd.DataFrame()
 
-df = pd.DataFrame(comparison_data)
+rows = []
+for fold in range(k_folds):
+    row = {"Fold": fold, "Gene_C_Index": np.nan, "Fusion_C_Index": np.nan}
+    if not gene_df.empty and "fold" in gene_df.columns:
+        t = gene_df[gene_df["fold"] == fold]["val_cindex"].values
+        if len(t) > 0:
+            row["Gene_C_Index"] = t[0]
+    if not fusion_df.empty and "fold" in fusion_df.columns:
+        t = fusion_df[fusion_df["fold"] == fold]["val_cindex"].values
+        if len(t) > 0:
+            row["Fusion_C_Index"] = t[0]
+    rows.append(row)
+
+df = pd.DataFrame(rows)
 df.to_csv(final_csv, index=False)
 df.to_csv(report_csv, index=False)
 
-gene_mean = df['Gene_C_Index'].mean()
-fusion_mean = df['Fusion_C_Index'].mean()
+gene_mean = df["Gene_C_Index"].mean()
+fusion_mean = df["Fusion_C_Index"].mean()
 
-print("\n" + "="*50)
-print("📊 简化消融实验结果汇总")
-print("="*50)
+print("\n==================================================")
+print("简化消融结果汇总")
+print("==================================================")
 print(df.to_string(index=False))
-print("="*50)
-print(f"\n🎯 平均 C-Index:")
-print(f"   Gene Only: {gene_mean:.4f}")
-print(f"   Fusion:     {fusion_mean:.4f}")
-if gene_mean > 0:
-    improvement = ((fusion_mean - gene_mean) / gene_mean) * 100
-    print(f"\n📈 Fusion 相对于 Gene Only: {improvement:+.2f}%")
-print(f"\n📁 结果: ${FINAL_CSV}")
-print("="*50)
-EOF
+print("==================================================")
+print(f"Gene Only 平均 C-Index: {gene_mean:.4f}")
+print(f"Fusion    平均 C-Index: {fusion_mean:.4f}")
+if pd.notna(gene_mean) and gene_mean != 0 and pd.notna(fusion_mean):
+    imp = (fusion_mean - gene_mean) / gene_mean * 100
+    print(f"Fusion 相对 Gene Only 提升: {imp:+.2f}%")
+print(f"最终表格: {final_csv}")
+print(f"报告文件: {report_csv}")
+PY
+}
 
-echo ""
-echo "✅ ${STUDY} 消融实验完成！"
-echo "📁 结果目录: ${ABLRESULTS_DIR}"
-echo "📊 对比表格: ${FINAL_CSV}"
-echo "📋 报告文件: ${REPORT_CSV}"
+for STUDY in "${CANCERS_TO_RUN[@]}"; do
+    echo ""
+    echo "################################################################"
+    echo "开始处理癌种：${STUDY^^}"
+    echo "################################################################"
 
-done  # 结束癌症种类循环
+    LABEL_FILE="datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv"
+    SPLIT_DIR="splits/CGI_nested_cv/${STUDY}"
+    FEATURE_DIR="preprocessing/CGI_py/features/stable/${STUDY}"
+    OMICS_DIR="datasets_csv/raw_rna_data/combine/${STUDY}"
+    DATA_ROOT_DIR="data/${STUDY}/pt_files"
+    ABLRESULTS_DIR="results/ablation/${STUDY}"
+    LOG_DIR="log/${TODAY}/${STUDY}"
+    REPORT_DIR="report"
+    MAIN_LOG="${LOG_DIR}/ablation_simple.log"
+
+    mkdir -p "$LOG_DIR" "$REPORT_DIR" "$ABLRESULTS_DIR/gene" "$ABLRESULTS_DIR/fusion"
+
+    export SAMPLE_FEATURE_FILE="${FEATURE_DIR}/fold_0_genes.csv"
+    print_run_config "$STUDY" "$FEATURE_DIR" | tee -a "$MAIN_LOG"
+
+    if ! check_required_paths "$SPLIT_DIR" "$FEATURE_DIR" "$STUDY"; then
+        exit 1
+    fi
+
+    build_early_stop_args
+    echo "早停附加参数：${EXTRA_ARGS[*]:-无}" | tee -a "$MAIN_LOG"
+
+    run_mode "$STUDY" "Gene Only（仅基因）" 2 "gene" \
+        "$LABEL_FILE" "$SPLIT_DIR" "$OMICS_DIR" "$DATA_ROOT_DIR" "$ABLRESULTS_DIR"
+    export MODE_DIR="${ABLRESULTS_DIR}/gene"
+    export OUT_CSV="${ABLRESULTS_DIR}/gene/summary.csv"
+    export MODE_NAME="Gene Only"
+    export K_FOLDS
+    merge_mode_summary "$MODE_DIR" "$OUT_CSV" "$MODE_NAME" | tee -a "$MAIN_LOG"
+
+    run_mode "$STUDY" "Fusion（基因+文本）" 3 "fusion" \
+        "$LABEL_FILE" "$SPLIT_DIR" "$OMICS_DIR" "$DATA_ROOT_DIR" "$ABLRESULTS_DIR"
+    export MODE_DIR="${ABLRESULTS_DIR}/fusion"
+    export OUT_CSV="${ABLRESULTS_DIR}/fusion/summary.csv"
+    export MODE_NAME="Fusion"
+    merge_mode_summary "$MODE_DIR" "$OUT_CSV" "$MODE_NAME" | tee -a "$MAIN_LOG"
+
+    export AB_DIR="$ABLRESULTS_DIR"
+    export FINAL_CSV="${ABLRESULTS_DIR}/final_comparison.csv"
+    export REPORT_CSV="${REPORT_DIR}/${TODAY}_${STUDY}_ablation_simple.csv"
+    make_final_report "$AB_DIR" "$FINAL_CSV" "$REPORT_CSV" | tee -a "$MAIN_LOG"
+
+    echo "癌种 ${STUDY^^} 运行完成。"
+    echo "结果目录：${ABLRESULTS_DIR}"
+    echo "比较表：${FINAL_CSV}"
+    echo "报告：${REPORT_CSV}"
+done
 
 echo ""
 echo "################################################################"
-echo "### ✅ 所有癌症种类消融实验完成！"
+echo "全部癌种运行完成。"
+echo "结果总目录：results/ablation/"
+echo "报告目录：report/"
 echo "################################################################"
-echo "📁 结果目录: results/ablation/"
-echo "📋 报告目录: report/"
