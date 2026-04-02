@@ -113,6 +113,11 @@ NUM_PARTITIONS = 20
 # 输出前K个基因
 TOP_K = 100
 
+# 基因频次阈值（用于最终特征导出规则）
+# - <= 1: 按频次排序输出前 TOP_K 个基因
+# - > 1 : 输出“出现频次 > 该阈值”的所有基因
+GENE_FREQ_THRESHOLD = 1
+
 # 随机种子
 RANDOM_SEED = 42
 
@@ -370,7 +375,10 @@ def run_stable_genes_pipeline():
         print(f"  抽样比例: {sample_ratio_display}")
     print(f"  交叉验证折数: {NUM_FOLDS}")
     print(f"  迭代次数: {num_iterations}")
-    print(f"  输出top K基因: {TOP_K}")
+    if GENE_FREQ_THRESHOLD <= 1:
+        print(f"  基因筛选规则: 频次Top {TOP_K}（GENE_FREQ_THRESHOLD={GENE_FREQ_THRESHOLD}）")
+    else:
+        print(f"  基因筛选规则: 保留频次 > {GENE_FREQ_THRESHOLD} 的基因")
     print(f"  输出目录: {OUTPUT_DIR}")
     print("=" * 70)
 
@@ -439,28 +447,40 @@ def run_stable_genes_pipeline():
         print(f"  唯一基因数: {total_unique_genes}")
 
         sorted_genes = sorted(gene_counts.items(), key=lambda x: -x[1])
-        top_genes = sorted_genes[:TOP_K]
+        if GENE_FREQ_THRESHOLD <= 1:
+            selected_genes = sorted_genes[:TOP_K]
+            select_rule_desc = f"Top {TOP_K} 基因 (按出现频率排序)"
+        else:
+            selected_genes = [g for g in sorted_genes if g[1] > GENE_FREQ_THRESHOLD]
+            select_rule_desc = f"出现频次 > {GENE_FREQ_THRESHOLD} 的基因"
 
-        print(f"\n  Fold {fold} Top {TOP_K} 基因 (按出现频率排序):")
+        if len(selected_genes) == 0:
+            raise ValueError(
+                f"Fold {fold} 在当前阈值配置下未筛出任何基因: GENE_FREQ_THRESHOLD={GENE_FREQ_THRESHOLD}"
+            )
+
+        print(f"\n  Fold {fold} {select_rule_desc}:")
         print(f"  {'排名':<6} {'基因索引':<12} {'出现次数':<12} {'出现频率':<10}")
         print(f"  {'-'*45}")
 
-        for rank, (gene_idx, count) in enumerate(top_genes, 1):
+        for rank, (gene_idx, count) in enumerate(selected_genes, 1):
             freq = count / num_iterations * 100
             print(f"  {rank:<6} {gene_idx:<12} {count:<12} {freq:.1f}%")
 
         # 保存结果
         # 1. MATLAB格式
         top_genes_mat = {
-            'top_genes_indices': [g[0] for g in top_genes],
-            'top_genes_counts': [g[1] for g in top_genes],
+            'top_genes_indices': [g[0] for g in selected_genes],
+            'top_genes_counts': [g[1] for g in selected_genes],
             'all_gene_counts': gene_counts,
             'num_iterations': num_iterations,
             'sample_mode': SAMPLE_MODE,
             'sample_ratio': SAMPLE_RATIO if SAMPLE_MODE == 'random' else (NUM_PARTITIONS - 1) / NUM_PARTITIONS if SAMPLE_MODE == 'partitioned' else 1.0,
             'num_partitions': NUM_PARTITIONS if SAMPLE_MODE == 'partitioned' else 0,
             'cancer_type': CANCER_TYPE,
-            'fold': fold
+            'fold': fold,
+            'gene_freq_threshold': GENE_FREQ_THRESHOLD,
+            'top_k_when_threshold_disabled': TOP_K
         }
         mat_output_file = os.path.join(OUTPUT_DIR, f'stable_genes_fold{fold}_top100.mat')
         savemat(mat_output_file, top_genes_mat)
@@ -482,10 +502,12 @@ def run_stable_genes_pipeline():
         content_lines.append(f"# 抽样模式: {sample_mode_desc}")
         content_lines.append(f"# 迭代次数: {num_iterations}")
         content_lines.append(f"# 唯一基因数: {total_unique_genes}")
+        content_lines.append(f"# 频次阈值: {GENE_FREQ_THRESHOLD}")
+        content_lines.append(f"# TopK(阈值<=1时生效): {TOP_K}")
         content_lines.append(f"#")
         content_lines.append(f"# 排名\t基因索引\t出现次数\t出现频率")
         content_lines.append(f"{'='*50}")
-        for rank, (gene_idx, count) in enumerate(top_genes, 1):
+        for rank, (gene_idx, count) in enumerate(selected_genes, 1):
             freq = count / num_iterations * 100
             content_lines.append(f"{rank}\t{gene_idx}\t{count}\t{freq:.1f}%")
 
@@ -516,7 +538,7 @@ def run_stable_genes_pipeline():
 
         if sample_ids is not None and full_data is not None and patient_ids_all is not None:
             # 获取top基因索引列表
-            top_gene_indices = [g[0] for g in top_genes]
+            top_gene_indices = [g[0] for g in selected_genes]
 
             # 获取数据矩阵（不含标签列time）
             data_for_csv = full_data[:, :-1]  # 不包含最后一列（time）
