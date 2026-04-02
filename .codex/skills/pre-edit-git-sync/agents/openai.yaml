@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pre-Edit Git Sync"
+  short_description: "Require pull before edits and commit/push after code changes."
+  default_prompt: "Use $pre-edit-git-sync to apply code changes in this repository with the required Git workflow."

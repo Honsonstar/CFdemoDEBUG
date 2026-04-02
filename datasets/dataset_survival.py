@@ -664,6 +664,14 @@ class SurvivalDatasetFactory:
         # 【实锤日志】在读取前强制打印，让用户一眼看到
         print(f"🔍 [Data Loading] Loading gene features from: {fold_feature_file}")
 
+        # 强制固定到 stable 特征路径，禁用其它路径的优先级回退
+        fold_feature_file = fold_feature_file_stable
+        print(f"🔍 [Data Loading] Loading gene features from fixed path: {fold_feature_file}")
+        if not os.path.exists(fold_feature_file):
+            raise FileNotFoundError(
+                f"Required stable feature file not found for fold {fold}: {fold_feature_file}"
+            )
+
         custom_omics_dict = None
         if os.path.exists(fold_feature_file):
             print(f"🔄 [Nested CV] Loading dynamic features for Fold {fold}: {fold_feature_file}")
