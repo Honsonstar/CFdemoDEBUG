@@ -363,6 +363,10 @@ def run_stable_genes_pipeline():
         num_iterations = NUM_BOOTSTRAP
         sample_ratio_display = "100% (等量有放回)"
 
+    # 规则：random 模式下，先对训练集全集跑 1 次，再进行 NUM_BOOTSTRAP 次随机抽样
+    include_full_iteration = (SAMPLE_MODE == 'random')
+    total_iterations = num_iterations + (1 if include_full_iteration else 0)
+
     print("=" * 70)
     print(f"  基因稳定性验证 Pipeline - {CANCER_TYPE}")
     print("=" * 70)
@@ -374,7 +378,10 @@ def run_stable_genes_pipeline():
     else:
         print(f"  抽样比例: {sample_ratio_display}")
     print(f"  交叉验证折数: {NUM_FOLDS}")
-    print(f"  迭代次数: {num_iterations}")
+    if include_full_iteration:
+        print(f"  迭代次数: {total_iterations} (全集1次 + 随机抽样{num_iterations}次)")
+    else:
+        print(f"  迭代次数: {num_iterations}")
     if GENE_FREQ_THRESHOLD <= 1:
         print(f"  基因筛选规则: 频次Top {TOP_K}（GENE_FREQ_THRESHOLD={GENE_FREQ_THRESHOLD}）")
     else:
@@ -407,11 +414,26 @@ def run_stable_genes_pipeline():
         # 该fold的基因记录
         fold_all_genes = []
 
+        # random 模式下先跑一次全集迭代（不抽样）
+        if include_full_iteration:
+            print(f"\n  Fold {fold}, Iter 1/{total_iterations} (full training set)")
+            sampled_data = data
+            print(f"    样本数: {sampled_data.shape[0]}")
+
+            iter_start = time.time()
+            results = find_genes_gci_func(sampled_data, alpha=ALPHA)
+            iter_time = time.time() - iter_start
+
+            found_genes = results['found_genes']
+            print(f"    发现基因数: {len(found_genes)}, 耗时: {iter_time:.2f}s")
+            fold_all_genes.extend(found_genes)
+
         # 迭代抽样
         for iteration in range(num_iterations):
             iter_seed = RANDOM_SEED + fold * 10000 + iteration if RANDOM_SEED else None
+            iter_display = iteration + 1 + (1 if include_full_iteration else 0)
 
-            print(f"\n  Fold {fold}, Iter {iteration + 1}/{num_iterations} (seed={iter_seed})")
+            print(f"\n  Fold {fold}, Iter {iter_display}/{total_iterations} (seed={iter_seed})")
 
             # 数据抽样
             sampled_data = sample_data(
@@ -442,7 +464,7 @@ def run_stable_genes_pipeline():
         gene_counts = Counter(fold_all_genes)
         total_unique_genes = len(gene_counts)
 
-        print(f"  迭代次数: {num_iterations}")
+        print(f"  迭代次数: {total_iterations}")
         print(f"  该fold筛选出的基因总数（含重复）: {len(fold_all_genes)}")
         print(f"  唯一基因数: {total_unique_genes}")
 
@@ -464,7 +486,7 @@ def run_stable_genes_pipeline():
         print(f"  {'-'*45}")
 
         for rank, (gene_idx, count) in enumerate(selected_genes, 1):
-            freq = count / num_iterations * 100
+            freq = count / total_iterations * 100
             print(f"  {rank:<6} {gene_idx:<12} {count:<12} {freq:.1f}%")
 
         # 保存结果
@@ -473,7 +495,9 @@ def run_stable_genes_pipeline():
             'top_genes_indices': [g[0] for g in selected_genes],
             'top_genes_counts': [g[1] for g in selected_genes],
             'all_gene_counts': gene_counts,
-            'num_iterations': num_iterations,
+            'num_iterations': total_iterations,
+            'num_bootstrap_iterations': num_iterations,
+            'include_full_iteration': include_full_iteration,
             'sample_mode': SAMPLE_MODE,
             'sample_ratio': SAMPLE_RATIO if SAMPLE_MODE == 'random' else (NUM_PARTITIONS - 1) / NUM_PARTITIONS if SAMPLE_MODE == 'partitioned' else 1.0,
             'num_partitions': NUM_PARTITIONS if SAMPLE_MODE == 'partitioned' else 0,
@@ -500,7 +524,9 @@ def run_stable_genes_pipeline():
         content_lines.append(f"# 实验时间: {CURRENT_DATE}")
         content_lines.append(f"# 基因稳定性验证结果 - Fold {fold} - {CANCER_TYPE}")
         content_lines.append(f"# 抽样模式: {sample_mode_desc}")
-        content_lines.append(f"# 迭代次数: {num_iterations}")
+        content_lines.append(f"# 迭代次数: {total_iterations}")
+        if include_full_iteration:
+            content_lines.append(f"# 其中随机抽样次数: {num_iterations} (另含全集1次)")
         content_lines.append(f"# 唯一基因数: {total_unique_genes}")
         content_lines.append(f"# 频次阈值: {GENE_FREQ_THRESHOLD}")
         content_lines.append(f"# TopK(阈值<=1时生效): {TOP_K}")
@@ -508,7 +534,7 @@ def run_stable_genes_pipeline():
         content_lines.append(f"# 排名\t基因索引\t出现次数\t出现频率")
         content_lines.append(f"{'='*50}")
         for rank, (gene_idx, count) in enumerate(selected_genes, 1):
-            freq = count / num_iterations * 100
+            freq = count / total_iterations * 100
             content_lines.append(f"{rank}\t{gene_idx}\t{count}\t{freq:.1f}%")
 
         new_content = '\n'.join(content_lines) + '\n'
@@ -575,8 +601,8 @@ def run_stable_genes_pipeline():
     print(f"  所有Fold汇总")
     print(f"{'='*70}")
     print(f"  总Fold数: {NUM_FOLDS}")
-    print(f"  每Fold迭代次数: {num_iterations}")
-    print(f"  总运行次数: {NUM_FOLDS * num_iterations}")
+    print(f"  每Fold迭代次数: {total_iterations}")
+    print(f"  总运行次数: {NUM_FOLDS * total_iterations}")
     print(f"  总耗时: {total_time:.2f} 秒 ({total_time/60:.2f} 分钟)")
 
     print(f"\n{'='*70}")
