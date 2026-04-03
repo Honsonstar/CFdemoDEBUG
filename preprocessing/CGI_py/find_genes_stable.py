@@ -81,6 +81,7 @@ from find_genes_gci import load_data
 # 癌症类型 (brca, blca, hnsc, stad, coadread)
 CANCER_TYPE = 'coadread' 
 
+
 # 数据目录
 DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/CGI_nested_cv/{CANCER_TYPE}'
 
@@ -111,7 +112,7 @@ NUM_BOOTSTRAP = 50
 NUM_PARTITIONS = 20
 
 # 输出前K个基因
-TOP_K = 100
+TOP_K = 50
 
 # 基因频次阈值（用于最终特征导出规则）
 # - <= 1: 按频次排序输出前 TOP_K 个基因
