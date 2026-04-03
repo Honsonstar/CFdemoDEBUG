@@ -444,7 +444,7 @@ class FeatureGating(nn.Module):
 class SNNOmics(nn.Module):
     def __init__(self, omic_input_dim: int, model_size_omic: str='small', n_classes: int=4,
                  n_stage_classes: int=4, enable_multitask: bool=False, multitask_weight: float=0.3,
-                 graph_data_path: str="graph_data.pkl", ab_model: int=3):
+                 graph_data_path: str="graph_data.pkl", ab_model: int=3, encoder_dropout: float=0.25):
         """
         SNNOmics多模态生存预测模型
 
@@ -465,6 +465,7 @@ class SNNOmics(nn.Module):
 
         # 【新增】存储运行模式
         self.ab_model = ab_model
+        self.encoder_dropout = float(encoder_dropout)
         print(f"🚀 [Model Config] 运行模式: {ab_model} "
               f"({'仅文本' if ab_model == 1 else '仅基因' if ab_model == 2 else '多模态融合'})")
 
@@ -569,22 +570,22 @@ class SNNOmics(nn.Module):
         # 针对输入维度的不同范围，设计平滑的过渡层 (Buffer Layers)
         if omic_input_dim <= 64:
             # 极低维因果特征：使用窄漏斗防止严重过拟合
-            fc_omic.append(SNN_Block(dim1=omic_input_dim, dim2=32, dropout=0.1))
-            fc_omic.append(SNN_Block(dim1=32, dim2=target_dim, dropout=0.25))
+            fc_omic.append(SNN_Block(dim1=omic_input_dim, dim2=32, dropout=min(0.1, self.encoder_dropout)))
+            fc_omic.append(SNN_Block(dim1=32, dim2=target_dim, dropout=self.encoder_dropout))
 
         elif omic_input_dim < target_dim:
             # 100+ 的中等维度特征 (如 105, 140 等)：使用 128 维作为平滑过渡
             # 这样既不会丢失 100+ 基因的信息，也不会一步到位升维到 256 放大噪声
             mid_dim = 128
             # 在输入端应用较低的 dropout 容忍不稳定的特征波动
-            fc_omic.append(SNN_Block(dim1=omic_input_dim, dim2=mid_dim, dropout=0.15))
-            fc_omic.append(SNN_Block(dim1=mid_dim, dim2=target_dim, dropout=0.25))
+            fc_omic.append(SNN_Block(dim1=omic_input_dim, dim2=mid_dim, dropout=min(0.15, self.encoder_dropout)))
+            fc_omic.append(SNN_Block(dim1=mid_dim, dim2=target_dim, dropout=self.encoder_dropout))
 
         else:
             # 兼容未筛选的高维全集 (如原始的 4999 维或 1024 维)
-            fc_omic.append(SNN_Block(dim1=omic_input_dim, dim2=hidden[0], dropout=0.25))
+            fc_omic.append(SNN_Block(dim1=omic_input_dim, dim2=hidden[0], dropout=self.encoder_dropout))
             for i, _ in enumerate(hidden[1:]):
-                fc_omic.append(SNN_Block(dim1=hidden[i], dim2=hidden[i+1], dropout=0.25))
+                fc_omic.append(SNN_Block(dim1=hidden[i], dim2=hidden[i+1], dropout=self.encoder_dropout))
 
         self.fc_omic = nn.Sequential(*fc_omic)
 

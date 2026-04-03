@@ -378,7 +378,8 @@ def _init_model(args):
              "n_stage_classes": getattr(args.dataset_factory, 'n_stage_classes', 4),
              "enable_multitask": args.enable_multitask,
              "multitask_weight": args.multitask_weight,
-             "ab_model": ab_model  # 【新增】传递运行模式参数
+             "ab_model": ab_model,  # 【新增】传递运行模式参数
+             "encoder_dropout": args.encoder_dropout
         }
         model = SNNOmics(**model_dict)
 
