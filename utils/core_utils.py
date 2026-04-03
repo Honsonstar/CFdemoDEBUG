@@ -1279,11 +1279,8 @@ def _save_training_curves(training_history, results_dir, fold_idx):
 
     epochs = training_history['epochs']
     train_loss = training_history['train_loss']
-    val_cindex = training_history['val_cindex']
     val_cindex_ipcw = training_history['val_cindex_ipcw']
     val_BS = training_history['val_BS']
-    val_IBS = training_history['val_IBS']
-    val_iauc = training_history['val_iauc']
 
     # 创建图形 - 两个子图
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
@@ -1296,15 +1293,12 @@ def _save_training_curves(training_history, results_dir, fold_idx):
     ax1.legend(fontsize=10)
     ax1.grid(True, alpha=0.3)
 
-    # 子图2: C-Index 等评估指标曲线
-    ax2.plot(epochs, val_cindex, 'g-', linewidth=2, label='C-Index')
-    ax2.plot(epochs, val_cindex_ipcw, 'c-', linewidth=2, label='C-Index IPCW')
-    ax2.plot(epochs, val_BS, 'r-', linewidth=2, label='Brier Score')
-    ax2.plot(epochs, val_IBS, 'm-', linewidth=2, label='IBS')
-    ax2.plot(epochs, val_iauc, 'y-', linewidth=2, label='iAUC')
+    # 子图2: 仅保留最关键验证指标（用于过拟合/欠拟合判断）
+    ax2.plot(epochs, val_cindex_ipcw, 'c-', linewidth=2, label='Val C-Index IPCW')
+    ax2.plot(epochs, val_BS, 'r-', linewidth=2, label='Val Brier Score')
     ax2.set_xlabel('Epoch', fontsize=12)
     ax2.set_ylabel('Score', fontsize=12)
-    ax2.set_title('Validation Metrics Curve', fontsize=14)
+    ax2.set_title('Validation Key Metrics', fontsize=14)
     ax2.legend(fontsize=9, loc='best')
     ax2.grid(True, alpha=0.3)
 
