@@ -28,7 +28,7 @@ LR=0.00005
 # 正则强度（weight decay/L2）：大一些更抗过拟合，小一些更容易拟合训练集。
 REG=0.00001
 # 编码器 dropout：大一些抑制过拟合，小一些提升拟合能力。
-ENCODER_DROPOUT=0.35
+ENCODER_DROPOUT=0.25
 # 并发任务数：当前建议 1（稳定优先，便于定位单折错误）。
 MAX_JOBS=3
 
