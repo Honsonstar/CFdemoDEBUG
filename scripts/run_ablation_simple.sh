@@ -213,7 +213,7 @@ run_mode() {
                 --type_of_path combine \
                 --max_epochs "$MAX_EPOCHS" \
                 --lr "$LR" \
-                --opt adamW \
+                --opt adam \
                 --reg "$REG" \
                 --alpha_surv 0.5 \
                 --weighted_sample \
