@@ -177,48 +177,78 @@ run_mode() {
     echo "==============================================================" | tee -a "$mode_log"
 
     local failed_folds=()
+    local launched_folds=()
+
+    if [ "$MAX_JOBS" -lt 1 ]; then
+        echo "警告：MAX_JOBS=${MAX_JOBS} 非法，自动修正为 1" | tee -a "$mode_log"
+        MAX_JOBS=1
+    fi
+
     for fold in $(seq 0 $((K_FOLDS - 1))); do
         local fold_dir="${mode_dir}/fold_${fold}"
         local fold_log="${fold_dir}/training.log"
+        local fold_exit="${fold_dir}/exit_code.txt"
         mkdir -p "$fold_dir"
 
-        echo "启动 Fold ${fold}..." | tee -a "$mode_log"
+        rm -f "$fold_exit"
+        echo "  └─ 启动 Fold ${fold}..." | tee -a "$mode_log"
+        launched_folds+=("$fold")
 
-        python3 -u main.py \
-            --study "tcga_${study}" \
-            --k_start "$fold" \
-            --k_end "$((fold + 1))" \
-            --split_dir "$split_dir" \
-            --results_dir "$fold_dir" \
-            --seed "$SEED" \
-            --label_file "$label_file" \
-            --task survival \
-            --n_classes 4 \
-            --modality snn \
-            --omics_dir "$omics_dir" \
-            --fold_feature_dir "$feature_dir" \
-            --data_root_dir "$data_root_dir" \
-            --label_col survival_months \
-            --type_of_path combine \
-            --max_epochs "$MAX_EPOCHS" \
-            --lr "$LR" \
-            --opt adam \
-            --reg "$REG" \
-            --alpha_surv 0.5 \
-            --weighted_sample \
-            --batch_size 1 \
-            --bag_loss nll_surv \
-            --encoding_dim 256 \
-            --num_patches 4096 \
-            --wsi_projection_dim 256 \
-            --encoding_layer_1_dim 8 \
-            --encoding_layer_2_dim 16 \
-            --encoder_dropout "$ENCODER_DROPOUT" \
-            --ab_model "$ab_model" \
-            "${EXTRA_ARGS[@]}" \
-            > "$fold_log" 2>&1
+        (
+            python3 -u main.py \
+                --study "tcga_${study}" \
+                --k_start "$fold" \
+                --k_end "$((fold + 1))" \
+                --split_dir "$split_dir" \
+                --results_dir "$fold_dir" \
+                --seed "$SEED" \
+                --label_file "$label_file" \
+                --task survival \
+                --n_classes 4 \
+                --modality snn \
+                --omics_dir "$omics_dir" \
+                --fold_feature_dir "$feature_dir" \
+                --data_root_dir "$data_root_dir" \
+                --label_col survival_months \
+                --type_of_path combine \
+                --max_epochs "$MAX_EPOCHS" \
+                --lr "$LR" \
+                --opt adam \
+                --reg "$REG" \
+                --alpha_surv 0.5 \
+                --weighted_sample \
+                --batch_size 1 \
+                --bag_loss nll_surv \
+                --encoding_dim 256 \
+                --num_patches 4096 \
+                --wsi_projection_dim 256 \
+                --encoding_layer_1_dim 8 \
+                --encoding_layer_2_dim 16 \
+                --encoder_dropout "$ENCODER_DROPOUT" \
+                --ab_model "$ab_model" \
+                "${EXTRA_ARGS[@]}" \
+                > "$fold_log" 2>&1
+            echo $? > "$fold_exit"
+        ) &
 
-        local code=$?
+        while [ "$(jobs -rp | wc -l | tr -d ' ')" -ge "$MAX_JOBS" ]; do
+            echo "  └─ 达到最大并发数 ${MAX_JOBS}，等待..." | tee -a "$mode_log"
+            wait -n
+        done
+    done
+
+    wait
+    echo "  └─ ${mode_name} 所有 Fold 完成，开始校验结果..." | tee -a "$mode_log"
+
+    for fold in "${launched_folds[@]}"; do
+        local fold_dir="${mode_dir}/fold_${fold}"
+        local fold_log="${fold_dir}/training.log"
+        local fold_exit="${fold_dir}/exit_code.txt"
+        local code=999
+        if [ -f "$fold_exit" ]; then
+            code=$(cat "$fold_exit" | tr -d ' ')
+        fi
+
         if [ "$code" -ne 0 ]; then
             echo "错误：Fold ${fold} 训练失败，退出码=${code}，日志：${fold_log}" | tee -a "$mode_log"
             failed_folds+=("$fold")
