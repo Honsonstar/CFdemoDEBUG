@@ -1375,6 +1375,53 @@ def _is_early_stop_improved(mode, current_value, best_value, min_delta):
         return current_value < (best_value - min_delta)
     return current_value > (best_value + min_delta)
 
+def _set_text_encoder_trainable(model, trainable: bool):
+    """
+    Freeze/unfreeze text encoder parameters by name pattern.
+    Returns number of matched parameters.
+    """
+    matched = 0
+    for name, param in model.named_parameters():
+        if 'clinical_bert' in name:
+            param.requires_grad = trainable
+            matched += 1
+    return matched
+
+
+def _maybe_apply_two_stage_freeze(epoch, args, model, ab_model, freeze_state):
+    """
+    Apply two-stage freeze/unfreeze for text encoder during training.
+    freeze_state is a dict storing last applied state.
+    """
+    enabled = bool(getattr(args, 'two_stage_train', False))
+    if not enabled:
+        return
+
+    freeze_epochs = max(0, int(getattr(args, 'freeze_text_epochs', 0)))
+    if freeze_epochs <= 0:
+        return
+
+    fusion_only = bool(getattr(args, 'two_stage_fusion_only', False))
+    if fusion_only and ab_model != 3:
+        return
+
+    should_freeze = epoch < freeze_epochs
+    if freeze_state.get('frozen') is should_freeze:
+        return
+
+    matched = _set_text_encoder_trainable(model, trainable=(not should_freeze))
+    freeze_state['frozen'] = should_freeze
+
+    if matched == 0:
+        print("[两阶段训练] 警告：未匹配到 clinical_bert 参数，冻结/解冻未生效。")
+        return
+
+    if should_freeze:
+        print(f"[两阶段训练] Epoch {epoch}: 冻结文本编码器（clinical_bert*），持续至 epoch {freeze_epochs - 1}。")
+    else:
+        print(f"[两阶段训练] Epoch {epoch}: 解冻文本编码器（clinical_bert*），开始联合微调。")
+
+
 def _step(cur, args, loss_fn, model, optimizer, scheduler, train_loader, val_loader):
     r"""
     Trains the model for the set number of epochs and validates it.
@@ -1411,8 +1458,10 @@ def _step(cur, args, loss_fn, model, optimizer, scheduler, train_loader, val_loa
     early_stop_min_delta = float(getattr(args, 'early_stop_min_delta', 1e-3))
     best_monitor_value = -np.inf if early_stop_mode == 'max' else np.inf
     no_improve_epochs = 0
+    two_stage_state = {'frozen': None}
 
     for epoch in range(args.max_epochs):
+        _maybe_apply_two_stage_freeze(epoch, args, model, ab_model, two_stage_state)
         # 训练阶段
         if args.enable_multitask:
             train_result = _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, args.enable_multitask, ab_model=ab_model)
@@ -1546,8 +1595,10 @@ def _step_with_train_test_results(cur, args, loss_fn, model, optimizer, schedule
     no_improve_epochs = 0
 
     dataset_name = args.study.upper().replace('_', '_')
+    two_stage_state = {'frozen': None}
 
     for epoch in range(args.max_epochs):
+        _maybe_apply_two_stage_freeze(epoch, args, model, ab_model, two_stage_state)
         # 训练
         train_result = _train_loop_survival(epoch, model, args.modality, train_loader, optimizer, scheduler, loss_fn, args.enable_multitask, ab_model=ab_model)
         train_c_index, train_loss_epoch = train_result[0], train_result[1]

@@ -82,6 +82,12 @@ def _process_args():
                         help='epochs to wait for improvement before stopping (default: 5)')
     parser.add_argument('--early_stop_min_delta', type=float, default=1e-3,
                         help='minimum improvement to reset patience (default: 1e-3)')
+    parser.add_argument('--two_stage_train', action='store_true', default=False,
+                        help='enable two-stage training for fusion: freeze text encoder first, then unfreeze')
+    parser.add_argument('--freeze_text_epochs', type=int, default=0,
+                        help='number of initial epochs to freeze text encoder when two-stage training is enabled')
+    parser.add_argument('--two_stage_fusion_only', action='store_true', default=False,
+                        help='apply two-stage strategy only when ab_model==3 (fusion)')
 
     #---> model related
     parser.add_argument('--fusion', type=str, default=None)

@@ -49,6 +49,14 @@ EARLY_STOP_PATIENCE=5
 # 最小提升阈值：小于该提升量视为“无改进”。
 EARLY_STOP_MIN_DELTA=0.001
 
+# -------------------- 两阶段训练配置区 --------------------
+# 1=启用两阶段，0=关闭
+TWO_STAGE_ENABLE=1
+# 第1阶段冻结文本编码器的epoch数（建议5~10）
+FREEZE_TEXT_EPOCHS=8
+# 1=仅Fusion(ab_model=3)启用两阶段，0=所有模式都启用
+TWO_STAGE_FUSION_ONLY=1
+
 # -------------------- 公共路径 --------------------
 TODAY=$(date +%Y-%m-%d)
 
@@ -151,6 +159,19 @@ build_early_stop_args() {
         fi
     else
         echo "早停已关闭。"
+    fi
+}
+
+build_two_stage_args() {
+    if [ "$TWO_STAGE_ENABLE" -eq 1 ]; then
+        EXTRA_ARGS+=("--two_stage_train")
+        EXTRA_ARGS+=("--freeze_text_epochs" "$FREEZE_TEXT_EPOCHS")
+        if [ "$TWO_STAGE_FUSION_ONLY" -eq 1 ]; then
+            EXTRA_ARGS+=("--two_stage_fusion_only")
+        fi
+        echo "已启用两阶段训练：冻结文本${FREEZE_TEXT_EPOCHS}个epoch，随后解冻联合训练。"
+    else
+        echo "两阶段训练已关闭。"
     fi
 }
 
@@ -417,6 +438,7 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
     fi
 
     build_early_stop_args
+    build_two_stage_args
     echo "早停附加参数：${EXTRA_ARGS[*]:-无}" | tee -a "$MAIN_LOG"
 
     run_mode "$STUDY" "Gene Only（仅基因）" 2 "gene" \
