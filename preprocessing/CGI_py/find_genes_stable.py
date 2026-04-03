@@ -112,7 +112,7 @@ NUM_BOOTSTRAP = 50
 NUM_PARTITIONS = 20
 
 # 输出前K个基因
-TOP_K = 50
+TOP_K = 100
 
 # 基因频次阈值（用于最终特征导出规则）
 # - <= 1: 按频次排序输出前 TOP_K 个基因
