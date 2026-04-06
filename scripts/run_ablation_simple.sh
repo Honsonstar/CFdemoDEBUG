@@ -7,6 +7,8 @@
 
 set -u
 
+SCRIPT_START_TS=$(date +%s)
+
 # -------------------- 癌种参数 --------------------
 ALL_CANCERS=("brca" "blca" "hnsc" "stad" "coadread")
 if [ $# -eq 0 ]; then
@@ -413,6 +415,7 @@ PY
 }
 
 for STUDY in "${CANCERS_TO_RUN[@]}"; do
+    STUDY_START_TS=$(date +%s)
     echo ""
     echo "################################################################"
     echo "开始处理癌种：${STUDY^^}"
@@ -461,10 +464,17 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
     export REPORT_CSV="${REPORT_DIR}/${TODAY}_${STUDY}_ablation_simple.csv"
     make_final_report "$AB_DIR" "$FINAL_CSV" "$REPORT_CSV" | tee -a "$MAIN_LOG"
 
+    STUDY_END_TS=$(date +%s)
+    STUDY_TOTAL_SECONDS=$((STUDY_END_TS - STUDY_START_TS))
+    STUDY_HOURS=$((STUDY_TOTAL_SECONDS / 3600))
+    STUDY_MINUTES=$(((STUDY_TOTAL_SECONDS % 3600) / 60))
+    STUDY_REMAIN_SECONDS=$((STUDY_TOTAL_SECONDS % 60))
+
     echo "癌种 ${STUDY^^} 运行完成。"
     echo "结果目录：${ABLRESULTS_DIR}"
     echo "比较表：${FINAL_CSV}"
     echo "报告：${REPORT_CSV}"
+    printf "癌种 %s 耗时：%02d:%02d:%02d\n" "${STUDY^^}" "$STUDY_HOURS" "$STUDY_MINUTES" "$STUDY_REMAIN_SECONDS"
 done
 
 echo ""
@@ -472,4 +482,10 @@ echo "################################################################"
 echo "全部癌种运行完成。"
 echo "结果总目录：results/ablation/"
 echo "报告目录：report/"
+SCRIPT_END_TS=$(date +%s)
+TOTAL_SECONDS=$((SCRIPT_END_TS - SCRIPT_START_TS))
+TOTAL_HOURS=$((TOTAL_SECONDS / 3600))
+TOTAL_MINUTES=$(((TOTAL_SECONDS % 3600) / 60))
+TOTAL_REMAIN_SECONDS=$((TOTAL_SECONDS % 60))
+printf "总耗时：%02d:%02d:%02d\n" "$TOTAL_HOURS" "$TOTAL_MINUTES" "$TOTAL_REMAIN_SECONDS"
 echo "################################################################"
