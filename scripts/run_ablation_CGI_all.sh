@@ -7,6 +7,8 @@
 
 set -u
 
+SCRIPT_START_TS=$(date +%s)
+
 # -------------------- 癌种参数 --------------------
 ALL_CANCERS=("brca" "blca" "hnsc" "stad" "coadread")
 if [ $# -eq 0 ]; then
@@ -21,7 +23,7 @@ SEED=42
 K_FOLDS=5
 MAX_EPOCHS=20
 LR=0.00005
-REG=0.00001
+REG=0.0001
 ENCODER_DROPOUT=0.35
 MAX_JOBS=3
 GENE_TOPK=100
@@ -34,7 +36,7 @@ EARLY_STOP_PATIENCE=5
 EARLY_STOP_MIN_DELTA=0.001
 
 # -------------------- 两阶段训练配置区 --------------------
-TWO_STAGE_ENABLE=1
+TWO_STAGE_ENABLE=0
 FREEZE_TEXT_EPOCHS=8
 TWO_STAGE_FUSION_ONLY=1
 
@@ -208,15 +210,13 @@ run_mode() {
         local fold_exit="${fold_dir}/exit_code.txt"
         mkdir -p "$fold_dir"
 
-        # 防止读取旧结果：本轮开跑前清理旧summary
-        find "$fold_dir" -type f \( -name "summary_partial_*.csv" -o -name "summary.csv" \) -delete 2>/dev/null || true
         rm -f "$fold_exit"
 
         echo "  └─ 启动 Fold ${fold}..." | tee -a "$mode_log"
         launched_folds+=("$fold")
 
         (
-            python3 -u main.py \
+            python -u main.py \
                 --study "tcga_${study}" \
                 --k_start "$fold" \
                 --k_end "$((fold + 1))" \
@@ -234,7 +234,7 @@ run_mode() {
                 --type_of_path combine \
                 --max_epochs "$MAX_EPOCHS" \
                 --lr "$LR" \
-                --opt adam \
+                --opt adamW \
                 --reg "$REG" \
                 --alpha_surv 0.5 \
                 --weighted_sample \
@@ -432,6 +432,7 @@ PY
 }
 
 for STUDY in "${CANCERS_TO_RUN[@]}"; do
+    STUDY_START_TS=$(date +%s)
     echo ""
     echo "################################################################"
     echo "开始处理癌种：${STUDY^^}"
@@ -487,10 +488,17 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
     export REPORT_CSV="${REPORT_DIR}/${TODAY}_${STUDY}_ablation_simple.csv"
     make_final_report "$AB_DIR" "$FINAL_CSV" "$REPORT_CSV" | tee -a "$MAIN_LOG"
 
+    STUDY_END_TS=$(date +%s)
+    STUDY_TOTAL_SECONDS=$((STUDY_END_TS - STUDY_START_TS))
+    STUDY_HOURS=$((STUDY_TOTAL_SECONDS / 3600))
+    STUDY_MINUTES=$(((STUDY_TOTAL_SECONDS % 3600) / 60))
+    STUDY_REMAIN_SECONDS=$((STUDY_TOTAL_SECONDS % 60))
+
     echo "癌种 ${STUDY^^} 运行完成。"
     echo "结果目录：${ABLRESULTS_DIR}"
     echo "比较表：${FINAL_CSV}"
     echo "报告：${REPORT_CSV}"
+    printf "癌种 %s 耗时：%02d:%02d:%02d\n" "${STUDY^^}" "$STUDY_HOURS" "$STUDY_MINUTES" "$STUDY_REMAIN_SECONDS"
 done
 
 echo ""
@@ -498,4 +506,10 @@ echo "################################################################"
 echo "全部癌种运行完成。"
 echo "结果总目录：results/ablation/"
 echo "报告目录：report/"
+SCRIPT_END_TS=$(date +%s)
+TOTAL_SECONDS=$((SCRIPT_END_TS - SCRIPT_START_TS))
+TOTAL_HOURS=$((TOTAL_SECONDS / 3600))
+TOTAL_MINUTES=$(((TOTAL_SECONDS % 3600) / 60))
+TOTAL_REMAIN_SECONDS=$((TOTAL_SECONDS % 60))
+printf "总耗时：%02d:%02d:%02d\n" "$TOTAL_HOURS" "$TOTAL_MINUTES" "$TOTAL_REMAIN_SECONDS"
 echo "################################################################"

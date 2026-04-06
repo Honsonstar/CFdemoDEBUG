@@ -51,7 +51,7 @@ EARLY_STOP_MIN_DELTA=0.001
 
 # -------------------- 两阶段训练配置区 --------------------
 # 1=启用两阶段，0=关闭
-TWO_STAGE_ENABLE=1
+TWO_STAGE_ENABLE=0
 # 第1阶段冻结文本编码器的epoch数（建议5~10）
 FREEZE_TEXT_EPOCHS=8
 # 1=仅Fusion(ab_model=3)启用两阶段，0=所有模式都启用
@@ -78,7 +78,7 @@ print_run_config() {
     local gene_dim="未知"
 
     if [ -f "$sample_feature_file" ]; then
-        gene_dim=$(python3 - << 'PY'
+        gene_dim=$(python - << 'PY'
 import csv
 import os
 fp = os.environ.get("SAMPLE_FEATURE_FILE", "")
@@ -122,7 +122,7 @@ check_required_paths() {
 
     if [ ! -d "$split_dir" ]; then
         echo "错误：找不到划分目录：$split_dir"
-        echo "请先执行：python3 preprocessing/CGI/preprocess_test.py"
+        echo "请先执行：python preprocessing/CGI/preprocess_test.py"
         return 1
     fi
 
@@ -216,7 +216,7 @@ run_mode() {
         launched_folds+=("$fold")
 
         (
-            python3 -u main.py \
+            python -u main.py \
                 --study "tcga_${study}" \
                 --k_start "$fold" \
                 --k_end "$((fold + 1))" \
@@ -304,7 +304,7 @@ merge_mode_summary() {
     echo ""
     echo "📊 汇总 ${mode_name} 结果..."
 
-    python3 - << 'PY'
+    python - << 'PY'
 import glob
 import os
 import pandas as pd
@@ -361,7 +361,7 @@ make_final_report() {
     local final_csv="$2"
     local report_csv="$3"
 
-    python3 - << 'PY'
+    python - << 'PY'
 import os
 import numpy as np
 import pandas as pd
