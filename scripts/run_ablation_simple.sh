@@ -32,7 +32,7 @@ REG=0.0001
 # 编码器 dropout：大一些抑制过拟合，小一些提升拟合能力。
 ENCODER_DROPOUT=0.25
 # 并发任务数：当前建议 1（稳定优先，便于定位单折错误）。
-MAX_JOBS=3
+MAX_JOBS=2
 
 # 基因维度（特征数）控制：对应 stable top-k 特征实验入口。
 # 该值主要用于实验记录和打印，实际生效仍取决于你生成的特征文件内容。
@@ -61,6 +61,7 @@ TWO_STAGE_FUSION_ONLY=1
 
 # -------------------- 公共路径 --------------------
 TODAY=$(date +%Y-%m-%d)
+export K_FOLDS
 
 supports_early_stop() {
     local args_file="utils/process_args.py"
@@ -449,7 +450,6 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
     export MODE_DIR="${ABLRESULTS_DIR}/gene"
     export OUT_CSV="${ABLRESULTS_DIR}/gene/summary.csv"
     export MODE_NAME="Gene Only"
-    export K_FOLDS
     merge_mode_summary "$MODE_DIR" "$OUT_CSV" "$MODE_NAME" | tee -a "$MAIN_LOG"
 
     run_mode "$STUDY" "Fusion（基因+文本）" 3 "fusion" \
