@@ -100,7 +100,7 @@ CANCER_TYPE = 'coadread'
 DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/nested_cv/{CANCER_TYPE}'
 
 # 输出目录
-OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py/plot_cgi/{CANCER_TYPE}'
+OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/plot_cgi/{CANCER_TYPE}'
 
 # 交叉验证折数
 NUM_FOLDS = 5

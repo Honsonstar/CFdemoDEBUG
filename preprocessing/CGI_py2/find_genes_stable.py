@@ -54,6 +54,7 @@ from scipy.io import savemat, loadmat
 from collections import Counter
 import time
 import pandas as pd
+from multiprocessing import Pool, cpu_count
 
 # 添加当前目录到路径，用于导入find_genes_gci模块
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -89,10 +90,10 @@ DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/CGI_nested
 CURRENT_DATE = datetime.datetime.now().strftime('%Y-%m-%d')
 
 # 输出目录
-OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py/plot_cgi/{CANCER_TYPE}'
+OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/plot_cgi/{CANCER_TYPE}'
 
 # CSV特征文件输出目录
-CSV_OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py/features/stable/{CANCER_TYPE}'
+CSV_OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/features/stable/{CANCER_TYPE}'
 
 # 交叉验证折数
 NUM_FOLDS = 5
@@ -127,6 +128,9 @@ ALPHA = 0.05
 
 # 马尔科夫毯层数: 1 (一层) 或 2 (两层，马尔科夫毯扩展版)
 MARKOV_BLANKET_LAYER = 1
+
+# 并行进程数 (0 或 None 表示使用所有可用CPU核心)
+NUM_PROCESSES = 0
 
 # 根据配置动态导入对应的函数
 if MARKOV_BLANKET_LAYER == 1:
