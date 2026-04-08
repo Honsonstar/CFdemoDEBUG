@@ -97,7 +97,7 @@ except ImportError:
 CANCER_TYPE = 'coadread'
 
 # 数据目录
-DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/CGI_nested_cv/{CANCER_TYPE}'
+DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/nested_cv/{CANCER_TYPE}'
 
 # 输出目录
 OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py/plot_cgi/{CANCER_TYPE}'
