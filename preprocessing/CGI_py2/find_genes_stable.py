@@ -1,47 +1,33 @@
-"""
+﻿"""
 ================================================================================
-find_genes_stable.py - 基因稳定性验证与频率排序 Pipeline
+find_genes_stable.py - 鍩哄洜绋冲畾鎬ч獙璇佷笌棰戠巼鎺掑簭 Pipeline
 ================================================================================
 
-【文件作用】
-对每折训练集进行多次抽样运行 find_genes_gci2（马尔科夫毯扩展版），
-统计基因出现频率并排序输出 top100（不进行降维，直接使用原始数据）
+銆愭枃浠朵綔鐢ㄣ€?瀵规瘡鎶樿缁冮泦杩涜澶氭鎶芥牱杩愯 find_genes_gci2锛堥┈灏旂澶鎵╁睍鐗堬級锛?缁熻鍩哄洜鍑虹幇棰戠巼骞舵帓搴忚緭鍑?top100锛堜笉杩涜闄嶇淮锛岀洿鎺ヤ娇鐢ㄥ師濮嬫暟鎹級
 
-【重要更新 - 2026-03-20】
-- 原版本调用 find_genes_gci (第一版)
-- 新版本调用 find_genes_gci2 (马尔科夫毯扩展版)
-- find_genes_gci2 在 find_genes_gci 的结果基础上，往外多做一层马尔科夫毯：
-  1. 先运行 find_genes_gci 得到初始因果基因
-  2. 轮流将筛选出来的基因作为目标变量进行筛选
-  3. 将所有得到的基因的并集作为 found_genes 输出
+銆愰噸瑕佹洿鏂?- 2026-03-20銆?- 鍘熺増鏈皟鐢?find_genes_gci (绗竴鐗?
+- 鏂扮増鏈皟鐢?find_genes_gci2 (椹皵绉戝か姣墿灞曠増)
+- find_genes_gci2 鍦?find_genes_gci 鐨勭粨鏋滃熀纭€涓婏紝寰€澶栧鍋氫竴灞傞┈灏旂澶锛?  1. 鍏堣繍琛?find_genes_gci 寰楀埌鍒濆鍥犳灉鍩哄洜
+  2. 杞祦灏嗙瓫閫夊嚭鏉ョ殑鍩哄洜浣滀负鐩爣鍙橀噺杩涜绛涢€?  3. 灏嗘墍鏈夊緱鍒扮殑鍩哄洜鐨勫苟闆嗕綔涓?found_genes 杈撳嚭
 
-【算法流程】
-1. 加载每折的训练数据 (train_fold*.mat)
-2. 对该fold进行N次抽样（Bootstrap或Random）
-3. 运行 find_genes_gci2 筛选因果基因
-4. 仅基于该fold的N次运行结果，统计基因出现频率并排序
-5. 对每个fold分别输出Top K基因
+銆愮畻娉曟祦绋嬨€?1. 鍔犺浇姣忔姌鐨勮缁冩暟鎹?(train_fold*.mat)
+2. 瀵硅fold杩涜N娆℃娊鏍凤紙Bootstrap鎴朢andom锛?3. 杩愯 find_genes_gci2 绛涢€夊洜鏋滃熀鍥?4. 浠呭熀浜庤fold鐨凬娆¤繍琛岀粨鏋滐紝缁熻鍩哄洜鍑虹幇棰戠巼骞舵帓搴?5. 瀵规瘡涓猣old鍒嗗埆杈撳嚭Top K鍩哄洜
 
-【使用方法】
-```bash
+銆愪娇鐢ㄦ柟娉曘€?```bash
 python find_genes_stable.py
 ```
 
-【配置参数】
-- SAMPLE_MODE: 'bootstrap' (有放回) / 'random' (无放回) / 'partitioned' (分区抽样)
-- SAMPLE_RATIO: 抽样比例 (仅 random 模式生效)
-- NUM_BOOTSTRAP: 迭代次数 (bootstrap/random 模式)
-- NUM_PARTITIONS: 分区数量 (仅 partitioned 模式)
-- TOP_K: 输出前K个基因
+銆愰厤缃弬鏁般€?- SAMPLE_MODE: 'bootstrap' (鏈夋斁鍥? / 'random' (鏃犳斁鍥? / 'partitioned' (鍒嗗尯鎶芥牱)
+- SAMPLE_RATIO: 鎶芥牱姣斾緥 (浠?random 妯″紡鐢熸晥)
+- NUM_BOOTSTRAP: 杩唬娆℃暟 (bootstrap/random 妯″紡)
+- NUM_PARTITIONS: 鍒嗗尯鏁伴噺 (浠?partitioned 妯″紡)
+- TOP_K: 杈撳嚭鍓岾涓熀鍥?
+銆愯緭鍑烘枃浠躲€?- stable_genes_fold{fold}_top100.mat: 璇old鐨勫墠100鍩哄洜 (MATLAB鏍煎紡)
+- stable_genes_fold{fold}_top100.txt: 璇old鐨勫墠100鍩哄洜 (鏂囨湰鏍煎紡)
 
-【输出文件】
-- stable_genes_fold{fold}_top100.mat: 该fold的前100基因 (MATLAB格式)
-- stable_genes_fold{fold}_top100.txt: 该fold的前100基因 (文本格式)
-
-【依赖】
-- numpy
+銆愪緷璧栥€?- numpy
 - scipy.io
-- find_genes_gci2 (同目录下)
+- find_genes_gci2 (鍚岀洰褰曚笅)
 
 ================================================================================
 """
@@ -56,91 +42,88 @@ import time
 import pandas as pd
 from multiprocessing import Pool, cpu_count
 
-# 添加当前目录到路径，用于导入find_genes_gci模块
+# 娣诲姞褰撳墠鐩綍鍒拌矾寰勶紝鐢ㄤ簬瀵煎叆find_genes_gci妯″潡
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
 # ================================================================================
-# 原始版本使用 find_genes_gci (第一版)
+# 鍘熷鐗堟湰浣跨敤 find_genes_gci (绗竴鐗?
 # from find_genes_gci import find_genes_gci, load_data
 #
-# 新版本使用 find_genes_gci2 (马尔科夫毯扩展版)
-# 改动说明：
-#   - find_genes_gci2 在 find_genes_gci 的结果基础上，往外多做一层马尔科夫毯
-#   - 轮流将筛选出来的基因作为目标变量进行筛选
-#   - 将所有得到的基因的并集作为 found_genes 输出
+# 鏂扮増鏈娇鐢?find_genes_gci2 (椹皵绉戝か姣墿灞曠増)
+# 鏀瑰姩璇存槑锛?#   - find_genes_gci2 鍦?find_genes_gci 鐨勭粨鏋滃熀纭€涓婏紝寰€澶栧鍋氫竴灞傞┈灏旂澶
+#   - 杞祦灏嗙瓫閫夊嚭鏉ョ殑鍩哄洜浣滀负鐩爣鍙橀噺杩涜绛涢€?#   - 灏嗘墍鏈夊緱鍒扮殑鍩哄洜鐨勫苟闆嗕綔涓?found_genes 杈撳嚭
 # ================================================================================
-# 动态导入：根据 MARKOV_BLANKET_LAYER 配置选择使用哪个函数
+# 鍔ㄦ€佸鍏ワ細鏍规嵁 MARKOV_BLANKET_LAYER 閰嶇疆閫夋嫨浣跨敤鍝釜鍑芥暟
 from find_genes_gci import load_data
 
 
 # ================================================================================
-# ========== 配置区域 =============
+# ========== 閰嶇疆鍖哄煙 =============
 # ================================================================================
 
-# 癌症类型 (brca, blca, hnsc, stad, coadread)
+# 鐧岀棁绫诲瀷 (brca, blca, hnsc, stad, coadread)
 CANCER_TYPE = 'coadread' 
 
 
-# 数据目录
+# 鏁版嵁鐩綍
 DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/CGI_nested_cv/{CANCER_TYPE}'
-
-# 获取当前日期，用于输出目录
 CURRENT_DATE = datetime.datetime.now().strftime('%Y-%m-%d')
 
-# 输出目录
+# 鑾峰彇褰撳墠鏃ユ湡锛岀敤浜庤緭鍑虹洰褰?CURRENT_DATE = datetime.datetime.now().strftime('%Y-%m-%d')
+
+# 杈撳嚭鐩綍
 OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/plot_cgi/{CANCER_TYPE}'
 
-# CSV特征文件输出目录
+# CSV鐗瑰緛鏂囦欢杈撳嚭鐩綍
 CSV_OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/features/stable/{CANCER_TYPE}'
 
-# 交叉验证折数
+# 浜ゅ弶楠岃瘉鎶樻暟
 NUM_FOLDS = 5
 
-# 抽样模式: 'bootstrap' (有放回) / 'random' (无放回) / 'partitioned' (分区抽样)
+# 鎶芥牱妯″紡: 'bootstrap' (鏈夋斁鍥? / 'random' (鏃犳斁鍥? / 'partitioned' (鍒嗗尯鎶芥牱)
 SAMPLE_MODE = 'random'
 
-# 每次抽取的比例 (仅在 random 模式下生效)
-# bootstrap 模式下忽略此参数，固定为1.0
+# 姣忔鎶藉彇鐨勬瘮渚?(浠呭湪 random 妯″紡涓嬬敓鏁?
+# bootstrap 妯″紡涓嬪拷鐣ユ鍙傛暟锛屽浐瀹氫负1.0
 SAMPLE_RATIO = 0.9
 
-# 迭代次数 (bootstrap/random 模式)
+# 杩唬娆℃暟 (bootstrap/random 妯″紡)
 NUM_BOOTSTRAP = 50
-
-# 分区数量 (仅 partitioned 模式生效)
-# 将数据分成n份，每次取n-1份，循环n轮
 NUM_PARTITIONS = 20
-
-# 输出前K个基因
 TOP_K = 100
-
-# 基因频次阈值（用于最终特征导出规则）
-# - <= 1: 按频次排序输出前 TOP_K 个基因
-# - > 1 : 输出“出现频次 >= 该阈值”的所有基因
 GENE_FREQ_THRESHOLD = 1
 
-# 随机种子
-RANDOM_SEED = 42
+# 鍒嗗尯鏁伴噺 (浠?partitioned 妯″紡鐢熸晥)
+# 灏嗘暟鎹垎鎴恘浠斤紝姣忔鍙杗-1浠斤紝寰幆n杞?NUM_PARTITIONS = 20
 
-# 显著性水平
+# 杈撳嚭鍓岾涓熀鍥?TOP_K = 100
+
+# 鍩哄洜棰戞闃堝€硷紙鐢ㄤ簬鏈€缁堢壒寰佸鍑鸿鍒欙級
+# - <= 1: 鎸夐娆℃帓搴忚緭鍑哄墠 TOP_K 涓熀鍥?# - > 1 : 杈撳嚭鈥滃嚭鐜伴娆?>= 璇ラ槇鍊尖€濈殑鎵€鏈夊熀鍥?GENE_FREQ_THRESHOLD = 1
+
+# 闅忔満绉嶅瓙
+RANDOM_SEED = 42
 ALPHA = 0.05
 
-# 马尔科夫毯层数: 1 (一层) 或 2 (两层，马尔科夫毯扩展版)
+# 鏄捐憲鎬ф按骞?ALPHA = 0.05
+
+# 椹皵绉戝か姣眰鏁? 1 (涓€灞? 鎴?2 (涓ゅ眰锛岄┈灏旂澶鎵╁睍鐗?
 MARKOV_BLANKET_LAYER = 1
 
-# 并行进程数 (0 或 None 表示使用所有可用CPU核心)
+# 骞惰杩涚▼鏁?(0 鎴?None 琛ㄧず浣跨敤鎵€鏈夊彲鐢–PU鏍稿績)
 NUM_PROCESSES = 0
 
-# 根据配置动态导入对应的函数
+# 鏍规嵁閰嶇疆鍔ㄦ€佸鍏ュ搴旂殑鍑芥暟
 if MARKOV_BLANKET_LAYER == 1:
     from find_genes_gci import find_genes_gci as find_genes_gci_func
-    print(f"使用一层马尔科夫毯 (find_genes_gci)")
+    print(f"浣跨敤涓€灞傞┈灏旂澶 (find_genes_gci)")
 elif MARKOV_BLANKET_LAYER == 2:
     from find_genes_gci2 import find_genes_gci2 as find_genes_gci_func
-    print(f"使用两层马尔科夫毯 (find_genes_gci2)")
+    print(f"浣跨敤涓ゅ眰椹皵绉戝か姣?(find_genes_gci2)")
 else:
-    raise ValueError(f"MARKOV_BLANKET_LAYER 必须是 1 或 2，当前值: {MARKOV_BLANKET_LAYER}")
+    raise ValueError(f"MARKOV_BLANKET_LAYER 蹇呴』鏄?1 鎴?2锛屽綋鍓嶅€? {MARKOV_BLANKET_LAYER}")
 
 # ================================================================================
 
@@ -148,18 +131,8 @@ else:
 def sample_data(data: np.ndarray, mode: str, ratio: float = 1.0, seed: int = None,
                 iteration: int = 0, n_partitions: int = 10) -> np.ndarray:
     """
-    数据抽样函数，支持三种模式
-
-    参数:
-        data: 原始数据，形状为 (n_samples, n_features)
-        mode: 'bootstrap' / 'random' / 'partitioned'
-        ratio: 抽样比例 (仅 random 模式生效)
-        seed: 随机种子
-        iteration: 当前迭代轮次 (仅 partitioned 模式生效)
-        n_partitions: 分区数量 (仅 partitioned 模式生效)
-
-    返回:
-        抽取后的数据
+    Data sampling helper.
+    Supports: bootstrap / random / partitioned.
     """
     n_samples = data.shape[0]
 
@@ -167,52 +140,91 @@ def sample_data(data: np.ndarray, mode: str, ratio: float = 1.0, seed: int = Non
         np.random.seed(seed)
 
     if mode == 'bootstrap':
-        # 有放回抽样：每个样本可能被多次选中
         n_select = n_samples
         indices = np.random.choice(n_samples, size=n_select, replace=True)
     elif mode == 'random':
-        # 无放回抽样：每个样本最多被选中一次
         n_select = int(n_samples * ratio)
         indices = np.random.choice(n_samples, size=n_select, replace=False)
     elif mode == 'partitioned':
-        # 分区抽样：将数据分成n份，每次取n-1份
-        # 先打乱数据顺序，然后分成n份
         np.random.seed(seed if seed is not None else 42)
         shuffled_indices = np.random.permutation(n_samples)
         chunk_size = n_samples // n_partitions
 
-        # 本次要排除的样本索引范围
         val_start = iteration * chunk_size
         val_end = val_start + chunk_size if iteration < n_partitions - 1 else n_samples
-        val_indices = shuffled_indices[val_start:val_end]
-
-        # 本次使用的训练样本（排除val_indices）
         train_indices = np.concatenate([
             shuffled_indices[:val_start],
             shuffled_indices[val_end:]
         ])
         return data[train_indices]
     else:
-        raise ValueError(f"Invalid sampling mode: {mode}. Must be 'bootstrap', 'random', or 'partitioned'.")
+        raise ValueError(
+            f"Invalid sampling mode: {mode}. Must be 'bootstrap', 'random', or 'partitioned'."
+        )
 
     return data[indices]
+
+_POOL_CONTEXT = {}
+
+
+def _init_pool_worker(data: np.ndarray, sample_mode: str, sample_ratio: float,
+                      num_partitions: int, alpha: float):
+    """Initialize per-process context to reduce argument passing overhead."""
+    global _POOL_CONTEXT
+    _POOL_CONTEXT = {
+        'data': data,
+        'sample_mode': sample_mode,
+        'sample_ratio': sample_ratio,
+        'num_partitions': num_partitions,
+        'alpha': alpha
+    }
+
+
+def _run_iteration_task(task: tuple) -> dict:
+    """
+    Execute one iteration task in worker process.
+    task = (fold, iteration, iter_display, total_iterations, iter_seed)
+    """
+    fold, iteration, iter_display, total_iterations, iter_seed = task
+    sampled_data = sample_data(
+        _POOL_CONTEXT['data'],
+        mode=_POOL_CONTEXT['sample_mode'],
+        ratio=_POOL_CONTEXT['sample_ratio'],
+        seed=iter_seed,
+        iteration=iteration,
+        n_partitions=_POOL_CONTEXT['num_partitions']
+    )
+    iter_start = time.time()
+    results = find_genes_gci_func(sampled_data, alpha=_POOL_CONTEXT['alpha'])
+    iter_time = time.time() - iter_start
+    found_genes = results['found_genes']
+    return {
+        'fold': fold,
+        'iteration': iteration,
+        'iter_display': iter_display,
+        'total_iterations': total_iterations,
+        'iter_seed': iter_seed,
+        'sample_size': sampled_data.shape[0],
+        'found_genes': found_genes,
+        'iter_time': iter_time
+    }
 
 
 def load_train_sample_ids(cancer_type: str, fold: int, data_dir: str) -> list:
     """
-    从 nested_splits_{fold}.csv 文件中读取训练集样本ID
+    浠?nested_splits_{fold}.csv 鏂囦欢涓鍙栬缁冮泦鏍锋湰ID
 
-    参数:
-        cancer_type: 癌症类型
-        fold: 折数
-        data_dir: 数据目录
+    鍙傛暟:
+        cancer_type: 鐧岀棁绫诲瀷
+        fold: 鎶樻暟
+        data_dir: 鏁版嵁鐩綍
 
-    返回:
-        list: 训练集样本ID列表
+    杩斿洖:
+        list: 璁粌闆嗘牱鏈琁D鍒楄〃
     """
     splits_file = os.path.join(data_dir, f'nested_splits_{fold}.csv')
     if not os.path.exists(splits_file):
-        print(f"    警告: 未找到样本ID文件 {splits_file}")
+        print(f"    璀﹀憡: 鏈壘鍒版牱鏈琁D鏂囦欢 {splits_file}")
         return None
 
     df = pd.read_csv(splits_file)
@@ -222,24 +234,21 @@ def load_train_sample_ids(cancer_type: str, fold: int, data_dir: str) -> list:
 
 def load_all_sample_ids(cancer_type: str, fold: int, data_dir: str) -> list:
     """
-    从 nested_splits_{fold}.csv 文件中读取所有样本ID（train + val + test）
+    浠?nested_splits_{fold}.csv 鏂囦欢涓鍙栨墍鏈夋牱鏈琁D锛坱rain + val + test锛?
+    鍙傛暟:
+        cancer_type: 鐧岀棁绫诲瀷
+        fold: 鎶樻暟
+        data_dir: 鏁版嵁鐩綍
 
-    参数:
-        cancer_type: 癌症类型
-        fold: 折数
-        data_dir: 数据目录
-
-    返回:
-        list: 所有样本ID列表（按 train -> val -> test 顺序）
-    """
+    杩斿洖:
+        list: 鎵€鏈夋牱鏈琁D鍒楄〃锛堟寜 train -> val -> test 椤哄簭锛?    """
     splits_file = os.path.join(data_dir, f'nested_splits_{fold}.csv')
     if not os.path.exists(splits_file):
-        print(f"    警告: 未找到样本ID文件 {splits_file}")
+        print(f"    璀﹀憡: 鏈壘鍒版牱鏈琁D鏂囦欢 {splits_file}")
         return None
 
     df = pd.read_csv(splits_file)
-    # 依次读取 train, val, test 列，拼接成完整列表
-    all_samples = []
+    # 渚濇璇诲彇 train, val, test 鍒楋紝鎷兼帴鎴愬畬鏁村垪琛?    all_samples = []
     for col in ['train', 'val', 'test']:
         samples = df[col].dropna().tolist()
         all_samples.extend(samples)
@@ -249,60 +258,52 @@ def load_all_sample_ids(cancer_type: str, fold: int, data_dir: str) -> list:
 
 def load_full_data(cancer_type: str) -> tuple:
     """
-    加载完整数据（包含 train + val + test 所有样本）
+    鍔犺浇瀹屾暣鏁版嵁锛堝寘鍚?train + val + test 鎵€鏈夋牱鏈級
 
-    参数:
-        cancer_type: 癌症类型
+    鍙傛暟:
+        cancer_type: 鐧岀棁绫诲瀷
 
-    返回:
+    杩斿洖:
         tuple: (data_matrix, gene_names, patient_ids)
-            - data_matrix: 完整数据矩阵 (n_samples, n_genes+1)，最后一列是time
-            - gene_names: 基因名列表
-            - patient_ids: 与 data_matrix 行一一对应的 patient_id 列表
+            - data_matrix: 瀹屾暣鏁版嵁鐭╅樀 (n_samples, n_genes+1)锛屾渶鍚庝竴鍒楁槸time
+            - gene_names: 鍩哄洜鍚嶅垪琛?            - patient_ids: 涓?data_matrix 琛屼竴涓€瀵瑰簲鐨?patient_id 鍒楄〃
     """
-    # 完整数据文件路径（注意：在 coadread 子目录下）
-    data_dir = '/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI/data'
+    # 瀹屾暣鏁版嵁鏂囦欢璺緞锛堟敞鎰忥細鍦?coadread 瀛愮洰褰曚笅锛?    data_dir = '/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI/data'
     full_data_path = os.path.join(data_dir, cancer_type, f'{cancer_type}_data_with_id.csv')
 
     if not os.path.exists(full_data_path):
-        print(f"    警告: 未找到完整数据文件 {full_data_path}")
+        print(f"    璀﹀憡: 鏈壘鍒板畬鏁存暟鎹枃浠?{full_data_path}")
         return None, None, None
 
     df = pd.read_csv(full_data_path)
 
-    # 提取基因名（跳过第一列 patient_id 和最后一列 time）
-    gene_names = df.columns[1:-1].tolist()
+    # 鎻愬彇鍩哄洜鍚嶏紙璺宠繃绗竴鍒?patient_id 鍜屾渶鍚庝竴鍒?time锛?    gene_names = df.columns[1:-1].tolist()
     patient_ids = df['patient_id'].astype(str).tolist()
 
-    # 提取数据矩阵（跳过 patient_id 列，保留基因和 time）
-    data_matrix = df.iloc[:, 1:].values  # shape: (n_samples, n_genes+1)
+    # 鎻愬彇鏁版嵁鐭╅樀锛堣烦杩?patient_id 鍒楋紝淇濈暀鍩哄洜鍜?time锛?    data_matrix = df.iloc[:, 1:].values  # shape: (n_samples, n_genes+1)
 
-    print(f"    已加载完整数据: {data_matrix.shape[0]} 样本, {len(gene_names)} 基因")
+    print(f"    宸插姞杞藉畬鏁存暟鎹? {data_matrix.shape[0]} 鏍锋湰, {len(gene_names)} 鍩哄洜")
     return data_matrix, gene_names, patient_ids
 
 
 def load_gene_names(cancer_type: str) -> list:
     """
-    从原始CSV文件加载基因名列表
+    浠庡師濮婥SV鏂囦欢鍔犺浇鍩哄洜鍚嶅垪琛?
+    鍙傛暟:
+        cancer_type: 鐧岀棁绫诲瀷
 
-    参数:
-        cancer_type: 癌症类型
-
-    返回:
-        list: 基因名列表（按列索引顺序）
-    """
-    # 原始数据文件路径
+    杩斿洖:
+        list: 鍩哄洜鍚嶅垪琛紙鎸夊垪绱㈠紩椤哄簭锛?    """
+    # 鍘熷鏁版嵁鏂囦欢璺緞
     original_csv_path = f'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI/data/{cancer_type}/{cancer_type}_data_with_id.csv'
 
     if not os.path.exists(original_csv_path):
-        print(f"    警告: 未找到原始数据文件 {original_csv_path}")
+        print(f"    璀﹀憡: 鏈壘鍒板師濮嬫暟鎹枃浠?{original_csv_path}")
         return None
 
-    # 读取CSV获取列名（第一列是patient_id，最后是time）
-    df = pd.read_csv(original_csv_path, nrows=0)  # 只读取头部
-    # 列名: patient_id, gene1, gene2, ..., geneN, time
-    gene_names = df.columns[1:-1].tolist()  # 跳过patient_id和time
-    print(f"    已加载基因名: {len(gene_names)} 个")
+    df = pd.read_csv(original_csv_path, nrows=0)
+    gene_names = df.columns[1:-1].tolist()  # 璺宠繃patient_id鍜宼ime
+    print(f"    Loaded gene names: {len(gene_names)}")
     return gene_names
 
 
@@ -310,22 +311,20 @@ def save_stable_genes_csv(data: np.ndarray, gene_indices: list, sample_ids: list
                           output_file: str, gene_names: list = None,
                           index_name: str = 'gene_name'):
     """
-    将基因表达数据保存为 CSV 格式
+    灏嗗熀鍥犺〃杈炬暟鎹繚瀛樹负 CSV 鏍煎紡
 
-    参数:
-        data: 原始数据矩阵 (n_samples, n_genes)
-        gene_indices: 要保存的基因索引列表
-        sample_ids: 样本ID列表（用于列名）
-        output_file: 输出文件路径
-        gene_names: 基因名称列表（可选，用于行名）
-        index_name: 索引名称（默认 'gene_name'）
-    """
-    # 构建数据
+    鍙傛暟:
+        data: 鍘熷鏁版嵁鐭╅樀 (n_samples, n_genes)
+        gene_indices: 瑕佷繚瀛樼殑鍩哄洜绱㈠紩鍒楄〃
+        sample_ids: 鏍锋湰ID鍒楄〃锛堢敤浜庡垪鍚嶏級
+        output_file: 杈撳嚭鏂囦欢璺緞
+        gene_names: 鍩哄洜鍚嶇О鍒楄〃锛堝彲閫夛紝鐢ㄤ簬琛屽悕锛?        index_name: 绱㈠紩鍚嶇О锛堥粯璁?'gene_name'锛?    """
+    # 鏋勫缓鏁版嵁
     if sample_ids is None:
         sample_ids = [f'sample_{i}' for i in range(data.shape[0])]
 
-    # 创建DataFrame
-    # 行: 基因, 列: 样本
+    # 鍒涘缓DataFrame
+    # 琛? 鍩哄洜, 鍒? 鏍锋湰
     rows = []
     for gene_idx in gene_indices:
         gene_data = data[:, gene_idx]
@@ -336,28 +335,28 @@ def save_stable_genes_csv(data: np.ndarray, gene_indices: list, sample_ids: list
         row = [gene_name] + list(gene_data)
         rows.append(row)
 
-    # 构建列名
+    # 鏋勫缓鍒楀悕
     columns = ['gene_name'] + sample_ids
 
-    # 创建DataFrame
+    # 鍒涘缓DataFrame
     df = pd.DataFrame(rows, columns=columns)
 
-    # 设置索引名称
+    # 璁剧疆绱㈠紩鍚嶇О
     df.index.name = index_name
 
-    # 保存CSV（包含索引名称）
+    # 淇濆瓨CSV锛堝寘鍚储寮曞悕绉帮級
     df.to_csv(output_file, index=True)
-    print(f"    已保存CSV: {output_file}")
+    print(f"    宸蹭繚瀛楥SV: {output_file}")
 
 
 def run_stable_genes_pipeline():
     """
-    主函数：运行基因稳定性验证pipeline
+    涓诲嚱鏁帮細杩愯鍩哄洜绋冲畾鎬ч獙璇乸ipeline
     """
-    # 确保输出目录存在
+    # 纭繚杈撳嚭鐩綍瀛樺湪
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # 根据抽样模式确定迭代次数
+    # 鏍规嵁鎶芥牱妯″紡纭畾杩唬娆℃暟
     if SAMPLE_MODE == 'partitioned':
         num_iterations = NUM_PARTITIONS
         sample_ratio_display = f"{NUM_PARTITIONS - 1}/{NUM_PARTITIONS}"
@@ -366,136 +365,141 @@ def run_stable_genes_pipeline():
         sample_ratio_display = f"{int(SAMPLE_RATIO * 100)}%"
     else:  # bootstrap
         num_iterations = NUM_BOOTSTRAP
-        sample_ratio_display = "100% (等量有放回)"
+        sample_ratio_display = "100% (bootstrap)"
 
-    # 规则：random 模式下，先对训练集全集跑 1 次，再进行 NUM_BOOTSTRAP 次随机抽样
     include_full_iteration = (SAMPLE_MODE == 'random')
     total_iterations = num_iterations + (1 if include_full_iteration else 0)
 
     print("=" * 70)
-    print(f"  基因稳定性验证 Pipeline - {CANCER_TYPE}")
+    print(f"  鍩哄洜绋冲畾鎬ч獙璇?Pipeline - {CANCER_TYPE}")
     print("=" * 70)
-    print(f"  抽样模式: {SAMPLE_MODE}")
+    print(f"  鎶芥牱妯″紡: {SAMPLE_MODE}")
     if SAMPLE_MODE == 'partitioned':
-        print(f"  分区数量: {NUM_PARTITIONS}, 每次取: {sample_ratio_display}")
+        print(f"  鍒嗗尯鏁伴噺: {NUM_PARTITIONS}, 姣忔鍙? {sample_ratio_display}")
     elif SAMPLE_MODE == 'random':
-        print(f"  抽样比例: {sample_ratio_display} (无放回)")
+        print(f"  鎶芥牱姣斾緥: {sample_ratio_display} (鏃犳斁鍥?")
     else:
-        print(f"  抽样比例: {sample_ratio_display}")
-    print(f"  交叉验证折数: {NUM_FOLDS}")
+        print(f"  鎶芥牱姣斾緥: {sample_ratio_display}")
+    print(f"  浜ゅ弶楠岃瘉鎶樻暟: {NUM_FOLDS}")
     if include_full_iteration:
-        print(f"  迭代次数: {total_iterations} (全集1次 + 随机抽样{num_iterations}次)")
+        print(f"  杩唬娆℃暟: {total_iterations} (鍏ㄩ泦1娆?+ 闅忔満鎶芥牱{num_iterations}娆?")
     else:
-        print(f"  迭代次数: {num_iterations}")
+        print(f"  杩唬娆℃暟: {num_iterations}")
     if GENE_FREQ_THRESHOLD <= 1:
-        print(f"  基因筛选规则: 频次Top {TOP_K}（GENE_FREQ_THRESHOLD={GENE_FREQ_THRESHOLD}）")
+        print(f"  Gene selection: top {TOP_K} by frequency")
     else:
-        print(f"  基因筛选规则: 保留频次 >= {GENE_FREQ_THRESHOLD} 的基因")
-    print(f"  输出目录: {OUTPUT_DIR}")
+        print(f"  Gene selection: frequency >= {GENE_FREQ_THRESHOLD}")
+    print(f"  杈撳嚭鐩綍: {OUTPUT_DIR}")
     print("=" * 70)
 
     total_start_time = time.time()
+    available_cpus = cpu_count()
+    if NUM_PROCESSES is None or NUM_PROCESSES <= 0:
+        effective_num_processes = available_cpus
+    else:
+        effective_num_processes = min(NUM_PROCESSES, available_cpus)
+    print(f"  CPU cores: {available_cpus}, worker processes: {effective_num_processes}")
 
-    # 遍历每个fold
+    # 閬嶅巻姣忎釜fold
     for fold in range(NUM_FOLDS):
         print(f"\n{'='*60}")
         print(f"  Fold {fold + 1}/{NUM_FOLDS}")
         print(f"{'='*60}")
 
-        # 加载该fold的训练数据
         mat_file = os.path.join(DATA_DIR, f'train_fold{fold}.mat')
-        print(f"  加载数据: {mat_file}")
+        print(f"  鍔犺浇鏁版嵁: {mat_file}")
 
         if not os.path.exists(mat_file):
-            print(f"  警告: 数据文件不存在，跳过 fold {fold}")
+            print(f"  璀﹀憡: 鏁版嵁鏂囦欢涓嶅瓨鍦紝璺宠繃 fold {fold}")
             continue
 
-        # 加载数据（不进行降维）
         data = load_data(mat_file)
         n_samples, n_cols = data.shape
         n_genes = n_cols - 1
-        print(f"  原始数据: {n_samples} 样本 × {n_genes} 基因")
+        print(f"  鍘熷鏁版嵁: {n_samples} 鏍锋湰 脳 {n_genes} 鍩哄洜")
 
-        # 该fold的基因记录
         fold_all_genes = []
 
-        # random 模式下先跑一次全集迭代（不抽样）
+        # random 妯″紡涓嬪厛璺戜竴娆″叏闆嗚凯浠ｏ紙涓嶆娊鏍凤級
         if include_full_iteration:
             print(f"\n  Fold {fold}, Iter 1/{total_iterations} (full training set)")
             sampled_data = data
-            print(f"    样本数: {sampled_data.shape[0]}")
+            print(f"    鏍锋湰鏁? {sampled_data.shape[0]}")
 
             iter_start = time.time()
             results = find_genes_gci_func(sampled_data, alpha=ALPHA)
             iter_time = time.time() - iter_start
 
             found_genes = results['found_genes']
-            print(f"    发现基因数: {len(found_genes)}, 耗时: {iter_time:.2f}s")
+            print(f"    鍙戠幇鍩哄洜鏁? {len(found_genes)}, 鑰楁椂: {iter_time:.2f}s")
             fold_all_genes.extend(found_genes)
 
-        # 迭代抽样
+        # 杩唬鎶芥牱
+        iteration_tasks = []
         for iteration in range(num_iterations):
             iter_seed = RANDOM_SEED + fold * 10000 + iteration if RANDOM_SEED else None
             iter_display = iteration + 1 + (1 if include_full_iteration else 0)
+            iteration_tasks.append((fold, iteration, iter_display, total_iterations, iter_seed))
 
-            print(f"\n  Fold {fold}, Iter {iter_display}/{total_iterations} (seed={iter_seed})")
+        if effective_num_processes > 1 and len(iteration_tasks) > 1:
+            with Pool(
+                processes=effective_num_processes,
+                initializer=_init_pool_worker,
+                initargs=(data, SAMPLE_MODE, SAMPLE_RATIO, NUM_PARTITIONS, ALPHA)
+            ) as pool:
+                iter_results = pool.map(_run_iteration_task, iteration_tasks)
+        else:
+            _init_pool_worker(data, SAMPLE_MODE, SAMPLE_RATIO, NUM_PARTITIONS, ALPHA)
+            iter_results = [_run_iteration_task(task) for task in iteration_tasks]
 
-            # 数据抽样
-            sampled_data = sample_data(
-                data,
-                mode=SAMPLE_MODE,
-                ratio=SAMPLE_RATIO,
-                seed=iter_seed,
-                iteration=iteration,
-                n_partitions=NUM_PARTITIONS
+        for iter_result in iter_results:
+            print(
+                f"\n  Fold {iter_result['fold']}, Iter "
+                f"{iter_result['iter_display']}/{iter_result['total_iterations']} "
+                f"(seed={iter_result['iter_seed']})"
             )
-            print(f"    样本数: {sampled_data.shape[0]}")
+            print(f"    Sample count: {iter_result['sample_size']}")
+            print(
+                f"    Found genes: {len(iter_result['found_genes'])}, "
+                f"time: {iter_result['iter_time']:.2f}s"
+            )
+            fold_all_genes.extend(iter_result['found_genes'])
 
-            # 运行 find_genes_gci (根据 MARKOV_BLANKET_LAYER 配置选择一层或两层)
-            iter_start = time.time()
-            results = find_genes_gci_func(sampled_data, alpha=ALPHA)
-            iter_time = time.time() - iter_start
-
-            found_genes = results['found_genes']
-            print(f"    发现基因数: {len(found_genes)}, 耗时: {iter_time:.2f}s")
-
-            fold_all_genes.extend(found_genes)
-
-        # 该fold的统计与输出
+        # 璇old鐨勭粺璁′笌杈撳嚭
         print(f"\n{'='*60}")
-        print(f"  Fold {fold} 统计结果")
+        print(f"  Fold {fold} 缁熻缁撴灉")
         print(f"{'='*60}")
 
         gene_counts = Counter(fold_all_genes)
         total_unique_genes = len(gene_counts)
 
-        print(f"  迭代次数: {total_iterations}")
-        print(f"  该fold筛选出的基因总数（含重复）: {len(fold_all_genes)}")
-        print(f"  唯一基因数: {total_unique_genes}")
+        print(f"  杩唬娆℃暟: {total_iterations}")
+        print(f"  璇old绛涢€夊嚭鐨勫熀鍥犳€绘暟锛堝惈閲嶅锛? {len(fold_all_genes)}")
+        print(f"  鍞竴鍩哄洜鏁? {total_unique_genes}")
 
         sorted_genes = sorted(gene_counts.items(), key=lambda x: -x[1])
         if GENE_FREQ_THRESHOLD <= 1:
             selected_genes = sorted_genes[:TOP_K]
-            select_rule_desc = f"Top {TOP_K} 基因 (按出现频率排序)"
+            select_rule_desc = f"Top {TOP_K} genes by frequency"
         else:
             selected_genes = [g for g in sorted_genes if g[1] >= GENE_FREQ_THRESHOLD]
-            select_rule_desc = f"出现频次 >= {GENE_FREQ_THRESHOLD} 的基因"
+            select_rule_desc = f"Genes with frequency >= {GENE_FREQ_THRESHOLD}"
 
         if len(selected_genes) == 0:
             raise ValueError(
-                f"Fold {fold} 在当前阈值配置下未筛出任何基因: GENE_FREQ_THRESHOLD={GENE_FREQ_THRESHOLD}"
+                f"Fold {fold} 鍦ㄥ綋鍓嶉槇鍊奸厤缃笅鏈瓫鍑轰换浣曞熀鍥? GENE_FREQ_THRESHOLD={GENE_FREQ_THRESHOLD}"
             )
 
         print(f"\n  Fold {fold} {select_rule_desc}:")
-        print(f"  {'排名':<6} {'基因索引':<12} {'出现次数':<12} {'出现频率':<10}")
+        print(f"  {'鎺掑悕':<6} {'鍩哄洜绱㈠紩':<12} {'鍑虹幇娆℃暟':<12} {'鍑虹幇棰戠巼':<10}")
         print(f"  {'-'*45}")
 
         for rank, (gene_idx, count) in enumerate(selected_genes, 1):
             freq = count / total_iterations * 100
             print(f"  {rank:<6} {gene_idx:<12} {count:<12} {freq:.1f}%")
 
-        # 保存结果
-        # 1. MATLAB格式
+        # 淇濆瓨缁撴灉
+        # 1. MATLAB鏍煎紡
         top_genes_mat = {
             'top_genes_indices': [g[0] for g in selected_genes],
             'top_genes_counts': [g[1] for g in selected_genes],
@@ -513,30 +517,29 @@ def run_stable_genes_pipeline():
         }
         mat_output_file = os.path.join(OUTPUT_DIR, f'stable_genes_fold{fold}_top100.mat')
         savemat(mat_output_file, top_genes_mat)
-        print(f"\n  已保存: {mat_output_file}")
+        print(f"\n  宸蹭繚瀛? {mat_output_file}")
 
-        # 2. 文本格式 (新实验在上面)
+        # 2. 鏂囨湰鏍煎紡 (鏂板疄楠屽湪涓婇潰)
         txt_output_file = os.path.join(OUTPUT_DIR, f'stable_genes_fold{fold}_top100.txt')
         if SAMPLE_MODE == 'random':
-            sample_mode_desc = f"Random (无放回抽样, 比例={SAMPLE_RATIO})"
+            sample_mode_desc = f"Random (鏃犳斁鍥炴娊鏍? 姣斾緥={SAMPLE_RATIO})"
         elif SAMPLE_MODE == 'partitioned':
-            sample_mode_desc = f"Partitioned (分区抽样, {NUM_PARTITIONS}份, 每次取{NUM_PARTITIONS - 1}份)"
+            sample_mode_desc = f"Partitioned ({NUM_PARTITIONS} parts, use {NUM_PARTITIONS - 1} each run)"
         else:
-            sample_mode_desc = "Bootstrap (有放回抽样, 比例=1.0)"
+            sample_mode_desc = "Bootstrap (鏈夋斁鍥炴娊鏍? 姣斾緥=1.0)"
 
-        # 构建新内容
         content_lines = []
-        content_lines.append(f"# 实验时间: {CURRENT_DATE}")
-        content_lines.append(f"# 基因稳定性验证结果 - Fold {fold} - {CANCER_TYPE}")
-        content_lines.append(f"# 抽样模式: {sample_mode_desc}")
-        content_lines.append(f"# 迭代次数: {total_iterations}")
+        content_lines.append(f"# 瀹為獙鏃堕棿: {CURRENT_DATE}")
+        content_lines.append(f"# 鍩哄洜绋冲畾鎬ч獙璇佺粨鏋?- Fold {fold} - {CANCER_TYPE}")
+        content_lines.append(f"# 鎶芥牱妯″紡: {sample_mode_desc}")
+        content_lines.append(f"# 杩唬娆℃暟: {total_iterations}")
         if include_full_iteration:
-            content_lines.append(f"# 其中随机抽样次数: {num_iterations} (另含全集1次)")
-        content_lines.append(f"# 唯一基因数: {total_unique_genes}")
-        content_lines.append(f"# 频次阈值: {GENE_FREQ_THRESHOLD}")
-        content_lines.append(f"# TopK(阈值<=1时生效): {TOP_K}")
+            content_lines.append(f"# 鍏朵腑闅忔満鎶芥牱娆℃暟: {num_iterations} (鍙﹀惈鍏ㄩ泦1娆?")
+        content_lines.append(f"# 鍞竴鍩哄洜鏁? {total_unique_genes}")
+        content_lines.append(f"# 棰戞闃堝€? {GENE_FREQ_THRESHOLD}")
+        content_lines.append(f"# TopK(闃堝€?=1鏃剁敓鏁?: {TOP_K}")
         content_lines.append(f"#")
-        content_lines.append(f"# 排名\t基因索引\t出现次数\t出现频率")
+        content_lines.append(f"# 鎺掑悕\t鍩哄洜绱㈠紩\t鍑虹幇娆℃暟\t鍑虹幇棰戠巼")
         content_lines.append(f"{'='*50}")
         for rank, (gene_idx, count) in enumerate(selected_genes, 1):
             freq = count / total_iterations * 100
@@ -544,7 +547,7 @@ def run_stable_genes_pipeline():
 
         new_content = '\n'.join(content_lines) + '\n'
 
-        # 如果文件已存在，将新内容添加到最前面
+        # 濡傛灉鏂囦欢宸插瓨鍦紝灏嗘柊鍐呭娣诲姞鍒版渶鍓嶉潰
         if os.path.exists(txt_output_file):
             with open(txt_output_file, 'r') as f:
                 existing_content = f.read()
@@ -555,26 +558,21 @@ def run_stable_genes_pipeline():
         else:
             with open(txt_output_file, 'w') as f:
                 f.write(new_content)
-        print(f"  已保存: {txt_output_file}")
+        print(f"  宸蹭繚瀛? {txt_output_file}")
 
-        # 3. CSV特征文件格式（包含完整数据集 train + val + test）
-        # 确保CSV输出目录存在
+        # 3. CSV鐗瑰緛鏂囦欢鏍煎紡锛堝寘鍚畬鏁存暟鎹泦 train + val + test锛?        # 纭繚CSV杈撳嚭鐩綍瀛樺湪
         os.makedirs(CSV_OUTPUT_DIR, exist_ok=True)
 
-        # 获取该fold的所有样本ID（train + val + test）
         sample_ids = load_all_sample_ids(CANCER_TYPE, fold, DATA_DIR)
 
-        # 加载完整数据（包含所有样本）
+        # 鍔犺浇瀹屾暣鏁版嵁锛堝寘鍚墍鏈夋牱鏈級
         full_data, gene_names_all, patient_ids_all = load_full_data(CANCER_TYPE)
 
         if sample_ids is not None and full_data is not None and patient_ids_all is not None:
-            # 获取top基因索引列表
+            # 鑾峰彇top鍩哄洜绱㈠紩鍒楄〃
             top_gene_indices = [g[0] for g in selected_genes]
 
-            # 获取数据矩阵（不含标签列time）
-            data_for_csv = full_data[:, :-1]  # 不包含最后一列（time）
-
-            # 显式按 patient_id 对齐，避免假设 full_data 行顺序与 split 顺序一致
+            data_for_csv = full_data[:, :-1]
             patient_to_idx = {pid: idx for idx, pid in enumerate(patient_ids_all)}
             missing_sample_ids = [sid for sid in sample_ids if sid not in patient_to_idx]
             if missing_sample_ids:
@@ -588,7 +586,7 @@ def run_stable_genes_pipeline():
             for i, sample_id in enumerate(sample_ids):
                 aligned_data[i, :] = data_for_csv[patient_to_idx[sample_id], :]
 
-            # 保存CSV
+            # 淇濆瓨CSV
             csv_file = os.path.join(CSV_OUTPUT_DIR, f'fold_{fold}_genes.csv')
             save_stable_genes_csv(
                 aligned_data,
@@ -598,22 +596,21 @@ def run_stable_genes_pipeline():
                 gene_names_all
             )
 
-        print(f"\n  Fold {fold} 完成!")
+        print(f"\n  Fold {fold} 瀹屾垚!")
 
-    # 汇总
     total_time = time.time() - total_start_time
     print(f"\n{'='*70}")
-    print(f"  所有Fold汇总")
+    print("  All folds summary")
     print(f"{'='*70}")
-    print(f"  总Fold数: {NUM_FOLDS}")
-    print(f"  每Fold迭代次数: {total_iterations}")
-    print(f"  总运行次数: {NUM_FOLDS * total_iterations}")
-    print(f"  总耗时: {total_time:.2f} 秒 ({total_time/60:.2f} 分钟)")
+    print(f"  鎬籉old鏁? {NUM_FOLDS}")
+    print(f"  姣廎old杩唬娆℃暟: {total_iterations}")
+    print(f"  鎬昏繍琛屾鏁? {NUM_FOLDS * total_iterations}")
+    print(f"  鎬昏€楁椂: {total_time:.2f} 绉?({total_time/60:.2f} 鍒嗛挓)")
 
     print(f"\n{'='*70}")
-    print(f"  Pipeline 完成!")
+    print(f"  Pipeline 瀹屾垚!")
     print(f"{'='*70}")
-    print(f"\n  输出文件:")
+    print(f"\n  杈撳嚭鏂囦欢:")
     print(f"  - {OUTPUT_DIR}/stable_genes_fold{{fold}}_top100.mat")
     print(f"  - {OUTPUT_DIR}/stable_genes_fold{{fold}}_top100.txt")
     print(f"{'='*70}")
