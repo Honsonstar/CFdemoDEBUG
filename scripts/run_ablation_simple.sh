@@ -423,7 +423,7 @@ for STUDY in "${CANCERS_TO_RUN[@]}"; do
     echo "################################################################"
 
     LABEL_FILE="datasets_csv/clinical_data/tcga_${STUDY}_clinical.csv"
-    SPLIT_DIR="splits/CGI_nested_cv/${STUDY}"
+    SPLIT_DIR="splits/nested_cv/${STUDY}"
     FEATURE_DIR="preprocessing/CGI_py/features/stable/${STUDY}"
     OMICS_DIR="datasets_csv/raw_rna_data/combine/${STUDY}"
     DATA_ROOT_DIR="data/${STUDY}/pt_files"

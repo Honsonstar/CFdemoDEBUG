@@ -84,7 +84,7 @@ CANCER_TYPE = 'brca'
 
 
 # 数据目录
-DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/CGI_nested_cv/{CANCER_TYPE}'
+DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/nested_cv/{CANCER_TYPE}'
 
 # 获取当前日期，用于输出目录
 CURRENT_DATE = datetime.datetime.now().strftime('%Y-%m-%d')

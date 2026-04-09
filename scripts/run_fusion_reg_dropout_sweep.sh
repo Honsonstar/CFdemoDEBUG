@@ -42,7 +42,7 @@ fi
 #   尽量将目录前缀统一放在前面，便于后续迁移或集中调整。
 # -------------------------------------------------------------------
 CLINICAL_ROOT="datasets_csv/clinical_data"
-SPLIT_ROOT="splits/CGI_nested_cv"
+SPLIT_ROOT="splits/nested_cv"
 FEATURE_ROOT="preprocessing/CGI_py/features/stable"
 OMICS_ROOT="datasets_csv/raw_rna_data/combine"
 PT_ROOT="data"
