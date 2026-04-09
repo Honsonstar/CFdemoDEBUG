@@ -1,4 +1,4 @@
-﻿"""
+"""
 ================================================================================
 find_genes_stable.py - 基因稳定性验证与频率排序 Pipeline
 ================================================================================
@@ -54,7 +54,6 @@ from scipy.io import savemat, loadmat
 from collections import Counter
 import time
 import pandas as pd
-from multiprocessing import Pool, cpu_count
 
 # 添加当前目录到路径，用于导入find_genes_gci模块
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -80,7 +79,7 @@ from find_genes_gci import load_data
 # ================================================================================
 
 # 癌症类型 (brca, blca, hnsc, stad, coadread)
-CANCER_TYPE = 'brca' 
+CANCER_TYPE = 'coadread' 
 
 
 # 数据目录
@@ -90,10 +89,10 @@ DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/CGI_nested
 CURRENT_DATE = datetime.datetime.now().strftime('%Y-%m-%d')
 
 # 输出目录
-OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/plot_cgi/{CANCER_TYPE}'
+OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py/plot_cgi/{CANCER_TYPE}'
 
 # CSV特征文件输出目录
-CSV_OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/features/stable/{CANCER_TYPE}'
+CSV_OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py/features/stable/{CANCER_TYPE}'
 
 # 交叉验证折数
 NUM_FOLDS = 5
@@ -128,9 +127,6 @@ ALPHA = 0.05
 
 # 马尔科夫毯层数: 1 (一层) 或 2 (两层，马尔科夫毯扩展版)
 MARKOV_BLANKET_LAYER = 1
-
-# 并行进程数 (0 或 None 表示使用所有可用CPU核心)
-NUM_PROCESSES = 0
 
 # 根据配置动态导入对应的函数
 if MARKOV_BLANKET_LAYER == 1:
@@ -196,53 +192,6 @@ def sample_data(data: np.ndarray, mode: str, ratio: float = 1.0, seed: int = Non
         raise ValueError(f"Invalid sampling mode: {mode}. Must be 'bootstrap', 'random', or 'partitioned'.")
 
     return data[indices]
-
-
-# ========== 多进程支持 ==========
-_POOL_CONTEXT = {}
-
-
-def _init_pool_worker(data: np.ndarray, sample_mode: str, sample_ratio: float,
-                      num_partitions: int, alpha: float):
-    """Initialize per-process context to reduce argument passing overhead."""
-    global _POOL_CONTEXT
-    _POOL_CONTEXT = {
-        'data': data,
-        'sample_mode': sample_mode,
-        'sample_ratio': sample_ratio,
-        'num_partitions': num_partitions,
-        'alpha': alpha
-    }
-
-
-def _run_iteration_task(task: tuple) -> dict:
-    """
-    Execute one iteration task in worker process.
-    task = (fold, iteration, iter_display, total_iterations, iter_seed)
-    """
-    fold, iteration, iter_display, total_iterations, iter_seed = task
-    sampled_data = sample_data(
-        _POOL_CONTEXT['data'],
-        mode=_POOL_CONTEXT['sample_mode'],
-        ratio=_POOL_CONTEXT['sample_ratio'],
-        seed=iter_seed,
-        iteration=iteration,
-        n_partitions=_POOL_CONTEXT['num_partitions']
-    )
-    iter_start = time.time()
-    results = find_genes_gci_func(sampled_data, alpha=_POOL_CONTEXT['alpha'])
-    iter_time = time.time() - iter_start
-    found_genes = results['found_genes']
-    return {
-        'fold': fold,
-        'iteration': iteration,
-        'iter_display': iter_display,
-        'total_iterations': total_iterations,
-        'iter_seed': iter_seed,
-        'sample_size': sampled_data.shape[0],
-        'found_genes': found_genes,
-        'iter_time': iter_time
-    }
 
 
 def load_train_sample_ids(cancer_type: str, fold: int, data_dir: str) -> list:
@@ -443,14 +392,6 @@ def run_stable_genes_pipeline():
 
     total_start_time = time.time()
 
-    # 显示CPU核心数
-    available_cpus = cpu_count()
-    if NUM_PROCESSES is None or NUM_PROCESSES <= 0:
-        effective_num_processes = available_cpus
-    else:
-        effective_num_processes = min(NUM_PROCESSES, available_cpus)
-    print(f"  CPU cores: {available_cpus}, worker processes: {effective_num_processes}")
-
     # 遍历每个fold
     for fold in range(NUM_FOLDS):
         print(f"\n{'='*60}")
@@ -488,39 +429,33 @@ def run_stable_genes_pipeline():
             print(f"    发现基因数: {len(found_genes)}, 耗时: {iter_time:.2f}s")
             fold_all_genes.extend(found_genes)
 
-        # 迭代抽样 - 使用多进程池
-        iteration_tasks = []
+        # 迭代抽样
         for iteration in range(num_iterations):
             iter_seed = RANDOM_SEED + fold * 10000 + iteration if RANDOM_SEED else None
             iter_display = iteration + 1 + (1 if include_full_iteration else 0)
-            iteration_tasks.append((fold, iteration, iter_display, total_iterations, iter_seed))
 
-        # 根据进程数选择并行或串行执行
-        if effective_num_processes > 1 and len(iteration_tasks) > 1:
-            with Pool(
-                processes=effective_num_processes,
-                initializer=_init_pool_worker,
-                initargs=(data, SAMPLE_MODE, SAMPLE_RATIO, NUM_PARTITIONS, ALPHA)
-            ) as pool:
-                iter_results = pool.map(_run_iteration_task, iteration_tasks)
-        else:
-            # 串行执行（单进程或任务数少）
-            _init_pool_worker(data, SAMPLE_MODE, SAMPLE_RATIO, NUM_PARTITIONS, ALPHA)
-            iter_results = [_run_iteration_task(task) for task in iteration_tasks]
+            print(f"\n  Fold {fold}, Iter {iter_display}/{total_iterations} (seed={iter_seed})")
 
-        # 收集结果
-        for iter_result in iter_results:
-            print(
-                f"\n  Fold {iter_result['fold']}, Iter "
-                f"{iter_result['iter_display']}/{iter_result['total_iterations']} "
-                f"(seed={iter_result['iter_seed']})"
+            # 数据抽样
+            sampled_data = sample_data(
+                data,
+                mode=SAMPLE_MODE,
+                ratio=SAMPLE_RATIO,
+                seed=iter_seed,
+                iteration=iteration,
+                n_partitions=NUM_PARTITIONS
             )
-            print(f"    样本数: {iter_result['sample_size']}")
-            print(
-                f"    发现基因数: {len(iter_result['found_genes'])}, "
-                f"耗时: {iter_result['iter_time']:.2f}s"
-            )
-            fold_all_genes.extend(iter_result['found_genes'])
+            print(f"    样本数: {sampled_data.shape[0]}")
+
+            # 运行 find_genes_gci (根据 MARKOV_BLANKET_LAYER 配置选择一层或两层)
+            iter_start = time.time()
+            results = find_genes_gci_func(sampled_data, alpha=ALPHA)
+            iter_time = time.time() - iter_start
+
+            found_genes = results['found_genes']
+            print(f"    发现基因数: {len(found_genes)}, 耗时: {iter_time:.2f}s")
+
+            fold_all_genes.extend(found_genes)
 
         # 该fold的统计与输出
         print(f"\n{'='*60}")
