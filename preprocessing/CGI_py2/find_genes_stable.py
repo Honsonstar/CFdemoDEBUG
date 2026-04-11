@@ -79,21 +79,25 @@ from find_genes_gci import load_data
 # ========== 配置区域 =============
 # ================================================================================
 
-# 癌症类型 (brca, blca, hnsc, stad, coadread)
-CANCER_TYPE = 'brca' 
+# 癌症类型列表 (brca, blca, hnsc, stad, coadread)
+# 支持多个癌症类型，从命令行读取
+CANCER_TYPES = ['blca', 'hnsc', 'stad', 'coadread']  # 如果为空，从 sys.argv 读取 
 
 
-# 数据目录
-DATA_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/nested_cv/{CANCER_TYPE}'
+# 数据目录 (动态)
+def get_data_dir(cancer_type):
+    return rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/splits/nested_cv/{cancer_type}'
 
 # 获取当前日期，用于输出目录
 CURRENT_DATE = datetime.datetime.now().strftime('%Y-%m-%d')
 
-# 输出目录
-OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/plot_cgi/{CANCER_TYPE}'
+# 输出目录 (动态)
+def get_output_dir(cancer_type):
+    return rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/plot_cgi/{cancer_type}'
 
-# CSV特征文件输出目录
-CSV_OUTPUT_DIR = rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/features/stable/{CANCER_TYPE}'
+# CSV特征文件输出目录 (动态)
+def get_csv_output_dir(cancer_type):
+    return rf'/root/autodl-tmp/newcfdemo/CFdemo_gene_text_copy/preprocessing/CGI_py2/features/stable/{cancer_type}'
 
 # 交叉验证折数
 NUM_FOLDS = 5
@@ -397,12 +401,15 @@ def save_stable_genes_csv(data: np.ndarray, gene_indices: list, sample_ids: list
     print(f"    已保存CSV: {output_file}")
 
 
-def run_stable_genes_pipeline():
+def run_stable_genes_pipeline(cancer_type: str):
     """
     主函数：运行基因稳定性验证pipeline
     """
     # 确保输出目录存在
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    output_dir = get_output_dir(cancer_type)
+    csv_output_dir = get_csv_output_dir(cancer_type)
+    data_dir = get_data_dir(cancer_type)
+    os.makedirs(output_dir, exist_ok=True)
 
     # 根据抽样模式确定迭代次数
     if SAMPLE_MODE == 'partitioned':
@@ -420,7 +427,7 @@ def run_stable_genes_pipeline():
     total_iterations = num_iterations + (1 if include_full_iteration else 0)
 
     print("=" * 70)
-    print(f"  基因稳定性验证 Pipeline - {CANCER_TYPE}")
+    print(f"  基因稳定性验证 Pipeline - {cancer_type}")
     print("=" * 70)
     print(f"  抽样模式: {SAMPLE_MODE}")
     if SAMPLE_MODE == 'partitioned':
@@ -438,7 +445,7 @@ def run_stable_genes_pipeline():
         print(f"  基因筛选规则: 频次Top {TOP_K}（GENE_FREQ_THRESHOLD={GENE_FREQ_THRESHOLD}）")
     else:
         print(f"  基因筛选规则: 保留频次 >= {GENE_FREQ_THRESHOLD} 的基因")
-    print(f"  输出目录: {OUTPUT_DIR}")
+    print(f"  输出目录: {output_dir}")
     print("=" * 70)
 
     total_start_time = time.time()
@@ -458,7 +465,7 @@ def run_stable_genes_pipeline():
         print(f"{'='*60}")
 
         # 加载该fold的训练数据
-        mat_file = os.path.join(DATA_DIR, f'train_fold{fold}.mat')
+        mat_file = os.path.join(data_dir, f'train_fold{fold}.mat')
         print(f"  加载数据: {mat_file}")
 
         if not os.path.exists(mat_file):
@@ -567,17 +574,18 @@ def run_stable_genes_pipeline():
             'sample_mode': SAMPLE_MODE,
             'sample_ratio': SAMPLE_RATIO if SAMPLE_MODE == 'random' else (NUM_PARTITIONS - 1) / NUM_PARTITIONS if SAMPLE_MODE == 'partitioned' else 1.0,
             'num_partitions': NUM_PARTITIONS if SAMPLE_MODE == 'partitioned' else 0,
-            'cancer_type': CANCER_TYPE,
+            'cancer_type': cancer_type,
             'fold': fold,
             'gene_freq_threshold': GENE_FREQ_THRESHOLD,
             'top_k_when_threshold_disabled': TOP_K
         }
-        mat_output_file = os.path.join(OUTPUT_DIR, f'stable_genes_fold{fold}_top100.mat')
+        mat_output_file = os.path.join(output_dir, f'stable_genes_fold{fold}_top100.mat')
         savemat(mat_output_file, top_genes_mat)
         print(f"\n  已保存: {mat_output_file}")
 
         # 2. 文本格式 (新实验在上面)
-        txt_output_file = os.path.join(OUTPUT_DIR, f'stable_genes_fold{fold}_top100.txt')
+        txt_output_file = os.path.join(output_dir, f'stable_genes_fold{fold}_top100.txt')
+
         if SAMPLE_MODE == 'random':
             sample_mode_desc = f"Random (无放回抽样, 比例={SAMPLE_RATIO})"
         elif SAMPLE_MODE == 'partitioned':
@@ -588,7 +596,7 @@ def run_stable_genes_pipeline():
         # 构建新内容
         content_lines = []
         content_lines.append(f"# 实验时间: {CURRENT_DATE}")
-        content_lines.append(f"# 基因稳定性验证结果 - Fold {fold} - {CANCER_TYPE}")
+        content_lines.append(f"# 基因稳定性验证结果 - Fold {fold} - {cancer_type}")
         content_lines.append(f"# 抽样模式: {sample_mode_desc}")
         content_lines.append(f"# 迭代次数: {total_iterations}")
         if include_full_iteration:
@@ -620,13 +628,13 @@ def run_stable_genes_pipeline():
 
         # 3. CSV特征文件格式（包含完整数据集 train + val + test）
         # 确保CSV输出目录存在
-        os.makedirs(CSV_OUTPUT_DIR, exist_ok=True)
+        os.makedirs(csv_output_dir, exist_ok=True)
 
         # 获取该fold的所有样本ID（train + val + test）
-        sample_ids = load_all_sample_ids(CANCER_TYPE, fold, DATA_DIR)
+        sample_ids = load_all_sample_ids(cancer_type, fold, data_dir)
 
         # 加载完整数据（包含所有样本）
-        full_data, gene_names_all, patient_ids_all = load_full_data(CANCER_TYPE)
+        full_data, gene_names_all, patient_ids_all = load_full_data(cancer_type)
 
         if sample_ids is not None and full_data is not None and patient_ids_all is not None:
             # 获取top基因索引列表
@@ -650,7 +658,7 @@ def run_stable_genes_pipeline():
                 aligned_data[i, :] = data_for_csv[patient_to_idx[sample_id], :]
 
             # 保存CSV
-            csv_file = os.path.join(CSV_OUTPUT_DIR, f'fold_{fold}_genes.csv')
+            csv_file = os.path.join(csv_output_dir, f'fold_{fold}_genes.csv')
             save_stable_genes_csv(
                 aligned_data,
                 top_gene_indices,
@@ -675,10 +683,27 @@ def run_stable_genes_pipeline():
     print(f"  Pipeline 完成!")
     print(f"{'='*70}")
     print(f"\n  输出文件:")
-    print(f"  - {OUTPUT_DIR}/stable_genes_fold{{fold}}_top100.mat")
-    print(f"  - {OUTPUT_DIR}/stable_genes_fold{{fold}}_top100.txt")
+    print(f"  - {output_dir}/stable_genes_fold{{fold}}_top100.mat")
+    print(f"  - {output_dir}/stable_genes_fold{{fold}}_top100.txt")
     print(f"{'='*70}")
 
 
 if __name__ == '__main__':
-    run_stable_genes_pipeline()
+    # 从命令行参数读取癌症类型列表
+    cancer_types = CANCER_TYPES
+    if not cancer_types:
+        # 从 sys.argv 读取
+        if len(sys.argv) > 1:
+            cancer_types = sys.argv[1:]
+        else:
+            print("用法: python find_genes_stable.py blca brca hnsc stad coadread")
+            print("或者在代码中设置 CANCER_TYPES = ['blca', 'brca', ...]")
+            sys.exit(1)
+
+    print(f"将运行以下癌症类型: {cancer_types}")
+
+    for cancer_type in cancer_types:
+        print(f"\n{'#'*70}")
+        print(f"# 开始处理: {cancer_type}")
+        print(f"{'#'*70}")
+        run_stable_genes_pipeline(cancer_type)
